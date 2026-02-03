@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../utils/app_routes.dart';
 import '../screens/splash_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/auth/login_screen.dart';
@@ -37,6 +39,46 @@ import '../screens/system/session_expired_screen.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
+  // Deep linking is automatically supported by GoRouter
+  // Supported formats:
+  // - Custom scheme: evizor://login
+  // - Universal links: https://evizor.app/login
+  errorBuilder: (context, state) {
+    // Handle deep link errors gracefully
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Page not found',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'The requested page "${state.uri}" could not be found.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () => context.go(AppRoutes.home),
+              icon: const Icon(Icons.home),
+              label: const Text('Go Home'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  },
   routes: [
     // Splash & Onboarding
     GoRoute(

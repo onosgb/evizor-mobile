@@ -15,6 +15,7 @@ class CustomTextField extends StatelessWidget {
   final bool readOnly;
   final void Function(String)? onChanged;
   final VoidCallback? onTap;
+  final int? maxLength;
 
   const CustomTextField({
     super.key,
@@ -31,6 +32,7 @@ class CustomTextField extends StatelessWidget {
     this.readOnly = false,
     this.onChanged,
     this.onTap,
+    this.maxLength,
   });
 
   @override
@@ -55,6 +57,7 @@ class CustomTextField extends StatelessWidget {
           keyboardType: keyboardType,
           validator: validator,
           maxLines: maxLines,
+          maxLength: maxLength,
           enabled: enabled,
           readOnly: readOnly,
           onChanged: onChanged,
@@ -88,7 +91,15 @@ class CustomTextField extends StatelessWidget {
               horizontal: 16,
               vertical: 16,
             ),
+            counterText: '', // Hide character counter
           ),
+          buildCounter:
+              (
+                context, {
+                required currentLength,
+                required isFocused,
+                maxLength,
+              }) => null, // Completely remove counter widget
         ),
       ],
     );

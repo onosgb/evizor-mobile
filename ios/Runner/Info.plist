@@ -45,5 +45,24 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Deep Linking Configuration -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.evizor.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>evizor</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Universal Links (Associated Domains) -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:evizor.app</string>
+	</array>
 </dict>
 </plist>

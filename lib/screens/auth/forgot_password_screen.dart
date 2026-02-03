@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
+import '../../utils/toastification.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../services/api_client.dart';
+import '../../services/auth_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -16,6 +19,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _isLoading = false;
+  final AuthService _authService = AuthService(ApiClient().dio);
 
   @override
   void dispose() {
@@ -23,16 +27,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  void _handleReset() {
+  Future<void> _handleReset() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      // Simulate API call
-      Future.delayed(const Duration(seconds: 1), () {
+
+      try {
+        await _authService.forgotPassword(email: _emailController.text.trim());
+
         setState(() => _isLoading = false);
+
         if (mounted) {
-          context.push(AppRoutes.resetPassword);
+          successSnack('Password reset code has been sent to your email');
+          // Navigate directly to reset password screen with email
+          context.push(
+            AppRoutes.resetPassword,
+            extra: {'email': _emailController.text.trim()},
+          );
         }
-      });
+      } catch (e) {
+        setState(() => _isLoading = false);
+
+        if (mounted) {
+          errorSnack(e.toString().replaceFirst('Exception: ', ''));
+        }
+      }
     }
   }
 
@@ -85,7 +103,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 const SizedBox(height: 12),
                 // Description
                 Text(
-                  'Don\'t worry! Enter your email or phone number and we\'ll send you a link to reset your password.',
+                  'Don\'t worry! Enter your email and we\'ll send you a verification code to reset your password.',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey[600],
@@ -97,13 +115,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 // Email/Phone Input
                 CustomTextField(
                   label: 'Email or Phone',
-                  hint: 'Enter your email or phone number',
+                  hint: 'Enter your email',
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   prefixIcon: const Icon(Icons.email_outlined),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your email or phone number';
+                      return 'Please enter your email';
                     }
                     return null;
                   },
@@ -111,7 +129,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 const SizedBox(height: 32),
                 // Reset Button
                 CustomButton(
-                  text: 'Send Reset Link',
+                  text: 'Send Verification Code',
                   onPressed: _handleReset,
                   isLoading: _isLoading,
                 ),

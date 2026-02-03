@@ -176,16 +176,6 @@ class AuthService {
     try {
       // Log data before sending
       final requestData = {'email': email};
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('📤 PREPARING RESEND EMAIL VERIFICATION REQUEST');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('Endpoint: POST /auth/resend-email-verification');
-      print('Request Data:');
-      requestData.forEach((key, value) {
-        print('  $key: $value');
-      });
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
       final response = await _dio.post(
         '/auth/resend-email-verification',
         data: requestData,
@@ -224,15 +214,6 @@ class AuthService {
     try {
       // Log data before sending
       final requestData = {'email': email, 'token': otpCode};
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('📤 PREPARING EMAIL VERIFICATION REQUEST');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('Endpoint: POST /auth/verify-email');
-      print('Request Data:');
-      requestData.forEach((key, value) {
-        print('  $key: $value');
-      });
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _dio.post('/auth/verify-email', data: requestData);
 
@@ -254,6 +235,195 @@ class AuthService {
         );
       }
     } catch (e) {
+      throw Exception('An unexpected error occurred: ${e.toString()}');
+    }
+  }
+
+  /// Request password reset OTP
+  ///
+  /// Endpoint: POST /auth/forgot-password
+  /// Request: { "email": "string" }
+  /// Response: { "message": "string" }
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    try {
+      // Log data before sending
+      final requestData = {'email': email};
+
+      final response = await _dio.post(
+        '/auth/forgot-password',
+        data: requestData,
+      );
+
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      // Handle Dio errors
+      if (e.response != null) {
+        // Server responded with error status
+        final errorData = e.response?.data;
+        throw Exception(
+          errorData?['message'] ??
+              errorData?['error'] ??
+              'Failed to send password reset code. Please try again.',
+        );
+      } else {
+        // Network or other error
+        throw Exception(
+          e.message ?? 'Network error. Please check your connection.',
+        );
+      }
+    } catch (e) {
+      throw Exception('An unexpected error occurred: ${e.toString()}');
+    }
+  }
+
+  /// Verify password reset OTP
+  ///
+  /// Endpoint: POST /auth/verify-reset-password
+  /// Request: { "email": "string", "token": "string" }
+  /// Response: { "message": "string" }
+  Future<Map<String, dynamic>> verifyResetPasswordOTP({
+    required String email,
+    required String otpCode,
+  }) async {
+    try {
+      // Log data before sending
+      final requestData = {'email': email, 'token': otpCode};
+      final response = await _dio.post(
+        '/auth/verify-reset-password',
+        data: requestData,
+      );
+
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      // Handle Dio errors
+      if (e.response != null) {
+        // Server responded with error status
+        final errorData = e.response?.data;
+        throw Exception(
+          errorData?['message'] ??
+              errorData?['error'] ??
+              'Invalid verification code. Please try again.',
+        );
+      } else {
+        // Network or other error
+        throw Exception(
+          e.message ?? 'Network error. Please check your connection.',
+        );
+      }
+    } catch (e) {
+      throw Exception('An unexpected error occurred: ${e.toString()}');
+    }
+  }
+
+  /// Resend password reset OTP
+  ///
+  /// Endpoint: POST /auth/resend-password-reset
+  /// Request: { "email": "string" }
+  /// Response: { "message": "string" }
+  Future<Map<String, dynamic>> resendPasswordReset({
+    required String email,
+  }) async {
+    try {
+      // Log data before sending
+      final requestData = {'email': email};
+      final response = await _dio.post(
+        '/auth/resend-password-reset',
+        data: requestData,
+      );
+
+      // Handle both String and Map responses
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      } else if (response.data is String) {
+        return {'message': response.data as String};
+      } else {
+        return {'message': 'Password reset code sent successfully'};
+      }
+    } on DioException catch (e) {
+      // Handle Dio errors
+      if (e.response != null) {
+        // Server responded with error status
+        final errorData = e.response?.data;
+        String errorMessage;
+        if (errorData is Map<String, dynamic>) {
+          errorMessage =
+              errorData['message'] ??
+              errorData['error'] ??
+              'Failed to resend password reset code. Please try again.';
+        } else if (errorData is String) {
+          errorMessage = errorData;
+        } else {
+          errorMessage =
+              'Failed to resend password reset code. Please try again.';
+        }
+        throw Exception(errorMessage);
+      } else {
+        // Network or other error
+        throw Exception(
+          e.message ?? 'Network error. Please check your connection.',
+        );
+      }
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('An unexpected error occurred: ${e.toString()}');
+    }
+  }
+
+  /// Reset password with OTP token
+  ///
+  /// Endpoint: POST /auth/reset-password
+  /// Request: { "token": "string", "newPassword": "string" }
+  /// Response: { "message": "string" }
+  Future<Map<String, dynamic>> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    try {
+      // Log data before sending
+      final requestData = {'token': token, 'newPassword': newPassword};
+
+      final response = await _dio.post(
+        '/auth/reset-password',
+        data: requestData,
+      );
+
+      // Handle both String and Map responses
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      } else if (response.data is String) {
+        return {'message': response.data as String};
+      } else {
+        return {'message': 'Password reset successfully'};
+      }
+    } on DioException catch (e) {
+      // Handle Dio errors
+      if (e.response != null) {
+        // Server responded with error status
+        final errorData = e.response?.data;
+        String errorMessage;
+        if (errorData is Map<String, dynamic>) {
+          errorMessage =
+              errorData['message'] ??
+              errorData['error'] ??
+              'Password reset failed. Please try again.';
+        } else if (errorData is String) {
+          errorMessage = errorData;
+        } else {
+          errorMessage = 'Password reset failed. Please try again.';
+        }
+        throw Exception(errorMessage);
+      } else {
+        // Network or other error
+        throw Exception(
+          e.message ?? 'Network error. Please check your connection.',
+        );
+      }
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }

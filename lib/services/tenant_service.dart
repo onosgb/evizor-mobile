@@ -11,12 +11,6 @@ class TenantService {
   /// Endpoint: GET /tenant/all-tenants
   Future<List<Tenant>> fetchAllTenants() async {
     try {
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('📤 FETCHING ALL TENANTS');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('Endpoint: GET /tenant/all-tenants');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
       final response = await _dio.get('/tenant/all-tenants');
 
       if (response.data is List) {
@@ -24,7 +18,6 @@ class TenantService {
             .map((json) => Tenant.fromJson(json as Map<String, dynamic>))
             .toList();
 
-        print('✅ Successfully fetched ${tenants.length} tenants');
         return tenants;
       } else {
         throw Exception('Unexpected response format');

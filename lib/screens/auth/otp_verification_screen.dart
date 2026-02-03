@@ -28,6 +28,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
 
   // Data from previous screen
   Map<String, dynamic>? _extraData;
+  String _flowType =
+      'emailVerification'; // 'emailVerification' or 'passwordReset'
 
   @override
   void initState() {
@@ -39,6 +41,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         if (extra != null) {
           setState(() {
             _extraData = extra;
+            _flowType = extra['flowType'] as String? ?? 'emailVerification';
           });
         }
       }
@@ -75,8 +78,16 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       return;
     }
 
-    // Get email from registration data
-    final email = _extraData?['registrationData']?['email'] as String?;
+    String? email;
+
+    // Get email based on flow type
+    if (_flowType == 'passwordReset') {
+      email = _extraData?['email'] as String?;
+    } else {
+      // Email verification flow
+      email = _extraData?['registrationData']?['email'] as String?;
+    }
+
     if (email == null) {
       errorSnack('Email not found. Please try again.');
       return;
@@ -85,14 +96,25 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Call email verification API
-      await _authService.verifyEmail(email: email, otpCode: otpCode);
+      if (_flowType == 'passwordReset') {
+        // For password reset, just navigate to reset password screen with OTP token
+        // No need to verify OTP separately - it will be verified when resetting password
+        setState(() => _isLoading = false);
 
-      setState(() => _isLoading = false);
+        if (mounted) {
+          // Navigate to reset password screen with OTP token
+          context.push(AppRoutes.resetPassword, extra: {'token': otpCode});
+        }
+      } else {
+        // Email verification flow
+        await _authService.verifyEmail(email: email, otpCode: otpCode);
 
-      if (mounted) {
-        successSnack('Email verified successfully');
-        context.go(AppRoutes.login);
+        setState(() => _isLoading = false);
+
+        if (mounted) {
+          successSnack('Email verified successfully');
+          context.go(AppRoutes.login);
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -104,8 +126,16 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   }
 
   Future<void> _handleResend() async {
-    // Get email from registration data
-    final email = _extraData?['registrationData']?['email'] as String?;
+    String? email;
+
+    // Get email based on flow type
+    if (_flowType == 'passwordReset') {
+      email = _extraData?['email'] as String?;
+    } else {
+      // Email verification flow
+      email = _extraData?['registrationData']?['email'] as String?;
+    }
+
     if (email == null) {
       errorSnack('Email not found. Please try again.');
       return;
@@ -120,8 +150,13 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     });
 
     try {
-      // Call resend email verification API
-      await _authService.resendEmailVerification(email: email);
+      if (_flowType == 'passwordReset') {
+        // Resend password reset OTP
+        await _authService.forgotPassword(email: email);
+      } else {
+        // Resend email verification OTP
+        await _authService.resendEmailVerification(email: email);
+      }
 
       if (mounted) {
         setState(() {
@@ -142,7 +177,12 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   }
 
   String _getEmail() {
-    final email = _extraData?['registrationData']?['email'] as String?;
+    String? email;
+    if (_flowType == 'passwordReset') {
+      email = _extraData?['email'] as String?;
+    } else {
+      email = _extraData?['registrationData']?['email'] as String?;
+    }
     return email ?? 'user@example.com';
   }
 
@@ -211,9 +251,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                 ),
                 const SizedBox(height: 32),
                 // Title
-                const Text(
-                  'OTP Verification',
-                  style: TextStyle(
+                Text(
+                  _flowType == 'passwordReset'
+                      ? 'Reset Password'
+                      : 'OTP Verification',
+                  style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
@@ -223,7 +265,9 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                 const SizedBox(height: 12),
                 // Description
                 Text(
-                  'We\'ve sent a verification code to\n$maskedEmail',
+                  _flowType == 'passwordReset'
+                      ? 'We\'ve sent a verification code to\n$maskedEmail\nEnter the code to reset your password'
+                      : 'We\'ve sent a verification code to\n$maskedEmail',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   textAlign: TextAlign.center,
                 ),
