@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/toastification.dart';
 
 class PrivacyControlsScreen extends StatefulWidget {
   const PrivacyControlsScreen({super.key});
@@ -190,9 +191,7 @@ class _PrivacyControlsScreenState extends State<PrivacyControlsScreen> {
                 title: 'Download Medical Data',
                 subtitle: 'Get a copy of your data',
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Download started')),
-                  );
+                  infoSnack('Download started');
                 },
               ),
               const SizedBox(height: 24),

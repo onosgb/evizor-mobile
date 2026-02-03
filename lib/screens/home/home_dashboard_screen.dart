@@ -1,18 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/user_provider.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
 
-class HomeDashboardScreen extends StatefulWidget {
+class HomeDashboardScreen extends ConsumerStatefulWidget {
   const HomeDashboardScreen({super.key});
 
   @override
-  State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
+  ConsumerState<HomeDashboardScreen> createState() =>
+      _HomeDashboardScreenState();
 }
 
-class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
+class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Ensure user data is loaded when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(currentUserSyncProvider);
+      if (user == null) {
+        // Try to load user data if not already loaded
+        refreshUserData(ref);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Watch async provider to sync data when available
+    ref.listen(currentUserProvider, (previous, next) {
+      next.whenData((user) {
+        if (user != null && mounted) {
+          // Update sync provider when async provider has data
+          final currentSyncUser = ref.read(currentUserSyncProvider);
+          if (currentSyncUser == null) {
+            ref.read(currentUserSyncProvider.notifier).state = user;
+          }
+        }
+      });
+    });
+
     return Scaffold(backgroundColor: Colors.white, body: _buildHomeContent());
   }
 
@@ -34,9 +63,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     children: [
                       Row(
                         children: [
-                          const Text(
-                            'Hello, John!',
-                            style: TextStyle(
+                          Text(
+                            _getGreeting(),
+                            style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
@@ -418,6 +447,26 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  String _getGreeting() {
+    // Try sync provider first (faster, cached)
+    final syncUser = ref.watch(currentUserSyncProvider);
+    if (syncUser != null && syncUser.firstName.isNotEmpty) {
+      return 'Hello, ${syncUser.firstName}!';
+    }
+
+    // Fallback: Use async provider as backup
+    final asyncUser = ref.watch(currentUserProvider);
+    return asyncUser.maybeWhen(
+      data: (user) {
+        if (user != null && user.firstName.isNotEmpty) {
+          return 'Hello, ${user.firstName}!';
+        }
+        return 'Hello!';
+      },
+      orElse: () => 'Hello!',
     );
   }
 }

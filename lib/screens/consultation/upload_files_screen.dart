@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 // import 'dart:io'; // Removed for design phase
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
+import '../../utils/toastification.dart';
 import '../../widgets/custom_button.dart';
 
 class UploadFilesScreen extends StatefulWidget {
@@ -20,9 +21,7 @@ class _UploadFilesScreenState extends State<UploadFilesScreen> {
 
   Future<void> _pickImage(String source) async {
     // Image picker temporarily disabled for design phase
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Image picker coming soon')));
+    infoSnack('Image picker coming soon');
     // Simulate file upload for design
     setState(() {
       _uploadedFiles.add('image_${_uploadedFiles.length + 1}.jpg');
@@ -31,9 +30,7 @@ class _UploadFilesScreenState extends State<UploadFilesScreen> {
 
   Future<void> _pickDocument() async {
     // Document picker temporarily disabled for design phase
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Document picker coming soon')),
-    );
+    infoSnack('Document picker coming soon');
     // Simulate file upload for design
     setState(() {
       _uploadedFiles.add('document_${_uploadedFiles.length + 1}.pdf');

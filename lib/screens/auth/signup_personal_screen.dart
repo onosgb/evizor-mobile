@@ -13,7 +13,8 @@ class SignUpPersonalScreen extends ConsumerStatefulWidget {
   const SignUpPersonalScreen({super.key});
 
   @override
-  ConsumerState<SignUpPersonalScreen> createState() => _SignUpPersonalScreenState();
+  ConsumerState<SignUpPersonalScreen> createState() =>
+      _SignUpPersonalScreenState();
 }
 
 class _SignUpPersonalScreenState extends ConsumerState<SignUpPersonalScreen> {
@@ -226,8 +227,11 @@ class _SignUpPersonalScreenState extends ConsumerState<SignUpPersonalScreen> {
   }
 
   Widget _buildLocationDropdown() {
+    // Read from cached provider data (already loaded by splash screen)
     final tenantsAsync = ref.watch(tenantsProvider);
 
+    // Since location is loaded on splash screen, we only need to handle the data state
+    // If data is not available here, it means splash screen didn't work correctly
     return tenantsAsync.when(
       data: (tenants) {
         return Column(
@@ -257,7 +261,10 @@ class _SignUpPersonalScreenState extends ConsumerState<SignUpPersonalScreen> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primaryColor, width: 2),
+                  borderSide: const BorderSide(
+                    color: AppColors.primaryColor,
+                    width: 2,
+                  ),
                 ),
                 errorBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -288,8 +295,28 @@ class _SignUpPersonalScreenState extends ConsumerState<SignUpPersonalScreen> {
           ],
         );
       },
-      loading: () => const Center(
-        child: CircularProgressIndicator(),
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Location',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: const Center(child: Text('Loading locations...')),
+          ),
+        ],
       ),
       error: (error, stack) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,7 +343,7 @@ class _SignUpPersonalScreenState extends ConsumerState<SignUpPersonalScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Failed to load locations. Please try again.',
+                    'Location data not available. Please restart the app.',
                     style: TextStyle(color: Colors.red[700]),
                   ),
                 ),

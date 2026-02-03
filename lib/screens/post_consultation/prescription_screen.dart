@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/toastification.dart';
 
 class PrescriptionScreen extends StatelessWidget {
   const PrescriptionScreen({super.key});
@@ -18,7 +19,7 @@ class PrescriptionScreen extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -36,7 +37,7 @@ class PrescriptionScreen extends StatelessWidget {
               'Prescribed by Dr. Sarah Johnson',
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 13),
             // Prescription Overview Card
             Container(
               padding: const EdgeInsets.all(20),
@@ -154,9 +155,7 @@ class PrescriptionScreen extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('PDF download started')),
-                      );
+                      infoSnack('PDF download started');
                     },
                     icon: const Icon(Icons.download, color: Colors.white),
                     label: const Text(
@@ -181,11 +180,7 @@ class PrescriptionScreen extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Sharing prescription...'),
-                        ),
-                      );
+                      infoSnack('Sharing prescription...');
                     },
                     icon: Icon(Icons.share, color: AppColors.primaryColor),
                     label: Text(

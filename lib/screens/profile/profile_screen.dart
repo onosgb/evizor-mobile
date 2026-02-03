@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/user_provider.dart';
+import '../../services/api_client.dart';
+import '../../services/storage_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.backgroundGrey,
       body: SafeArea(
@@ -48,7 +52,7 @@ class ProfileScreen extends StatelessWidget {
                       children: [
                         const SizedBox(height: 90),
                         // Personal Information Section
-                        _buildPersonalInformationSection(),
+                        _buildPersonalInformationSection(ref),
                         const SizedBox(height: 16),
                         // Medical History Section
                         _buildMedicalHistorySection(),
@@ -56,7 +60,7 @@ class ProfileScreen extends StatelessWidget {
                         // Logout Button
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: _buildLogoutButton(context),
+                          child: _buildLogoutButton(context, ref),
                         ),
                         const SizedBox(height: 24),
                       ],
@@ -70,7 +74,7 @@ class ProfileScreen extends StatelessWidget {
               top: 80,
               left: 0,
               right: 0,
-              child: _buildUserProfileCard(context),
+              child: _buildUserProfileCard(context, ref),
             ),
           ],
         ),
@@ -78,7 +82,13 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildUserProfileCard(BuildContext context) {
+  Widget _buildUserProfileCard(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserSyncProvider);
+    final userName = user?.fullName ?? 'John Doe';
+    final patientId = user?.id.isNotEmpty == true
+        ? '#P-${user!.id.substring(0, 8)}'
+        : '#P-2024-001';
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(20),
@@ -115,9 +125,9 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'John Doe',
-                  style: TextStyle(
+                Text(
+                  userName,
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
@@ -125,7 +135,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Patient ID: #P-2024-001',
+                  'Patient ID: $patientId',
                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
               ],
@@ -145,7 +155,15 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPersonalInformationSection() {
+  Widget _buildPersonalInformationSection(WidgetRef ref) {
+    final user = ref.watch(currentUserSyncProvider);
+    final email = user?.email ?? 'john.doe@email.com';
+    final phone = user?.phoneNumber ?? '+1 (555) 123-4567';
+    final dob = user?.dateOfBirth != null
+        ? '${user!.dateOfBirth!.day} ${_getMonthName(user.dateOfBirth!.month)}, ${user.dateOfBirth!.year}'
+        : 'Jan 15, 1990';
+    final gender = user?.gender ?? 'Male';
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(20),
@@ -172,13 +190,13 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _buildInfoRow('Email', 'john.doe@email.com'),
+          _buildInfoRow('Email', email),
           const SizedBox(height: 12),
-          _buildInfoRow('Phone', '+1 (555) 123-4567'),
+          _buildInfoRow('Phone', phone),
           const SizedBox(height: 12),
-          _buildInfoRow('Date of Birth', 'Jan 15, 1990'),
+          _buildInfoRow('Date of Birth', dob),
           const SizedBox(height: 12),
-          _buildInfoRow('Gender', 'Male'),
+          _buildInfoRow('Gender', gender),
           const SizedBox(height: 12),
           _buildInfoRow('Blood Group', 'O+'),
         ],
@@ -288,13 +306,65 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context) {
+  String _getMonthName(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return months[month - 1];
+  }
+
+  Widget _buildLogoutButton(BuildContext context, WidgetRef ref) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () {
-          // Handle logout
-          context.go(AppRoutes.login);
+        onPressed: () async {
+          // Show confirmation dialog
+          final shouldLogout = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Logout'),
+              content: const Text('Are you sure you want to logout?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('Logout'),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldLogout == true && context.mounted) {
+            // Clear all user data and tokens
+            final storageService = StorageService();
+            await storageService.logout(); // Clears tokens and user data
+
+            // Clear user provider state
+            ref.read(currentUserSyncProvider.notifier).state = null;
+
+            // Remove auth token from API client
+            ApiClient().removeAuthToken();
+
+            // Navigate to login
+            if (context.mounted) {
+              context.go(AppRoutes.login);
+            }
+          }
         },
         icon: const Icon(Icons.logout, color: Colors.white),
         label: const Text(

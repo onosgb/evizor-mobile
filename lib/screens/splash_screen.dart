@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/tenant_provider.dart';
+import '../providers/user_provider.dart';
+import '../services/storage_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_routes.dart';
 
@@ -16,8 +18,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _bounceAnimation;
+  final StorageService _storageService = StorageService();
   bool _tenantsLoaded = false;
   bool _minTimeElapsed = false;
+  bool _hasError = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -48,34 +53,82 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _preloadTenants() async {
     try {
-      // Trigger tenant loading by reading the provider
-      final tenantsAsync = ref.read(tenantsProvider);
-      await tenantsAsync.value; // Wait for tenants to load
+      // Trigger tenant loading by reading the provider's future
+      // This will wait for the data to load or throw an error
+      await ref.read(tenantsProvider.future);
 
+      // Successfully loaded tenants
       if (mounted) {
         setState(() {
           _tenantsLoaded = true;
+          _hasError = false;
+          _errorMessage = null;
         });
         _checkAndNavigate();
       }
     } catch (e) {
-      // Even if tenant loading fails, still navigate after min time
+      // Error loading tenants - show error and prevent navigation
       if (mounted) {
         setState(() {
-          _tenantsLoaded = true; // Allow navigation even on error
+          _hasError = true;
+          _errorMessage = 'Failed to load location data';
+          _tenantsLoaded = false; // Ensure navigation is blocked
         });
-        _checkAndNavigate();
+        _controller.stop(); // Stop animation when error occurs
       }
     }
   }
 
-  void _checkAndNavigate() {
+  void _retryLoading() {
+    setState(() {
+      _hasError = false;
+      _errorMessage = null;
+      _tenantsLoaded = false;
+    });
+
+    // Restart animation
+    _controller.repeat(reverse: true);
+
+    // Invalidate the provider cache to force a fresh load
+    ref.invalidate(tenantsProvider);
+
+    // Retry loading tenants
+    _preloadTenants();
+  }
+
+  Future<void> _checkAndNavigate() async {
     // Navigate only when both conditions are met:
     // 1. Minimum time has elapsed
-    // 2. Tenants are loaded (or failed to load)
-    if (_minTimeElapsed && _tenantsLoaded && mounted) {
+    // 2. Tenants are successfully loaded (not on error)
+    // This ensures we never navigate if location loading failed
+    if (_minTimeElapsed && _tenantsLoaded && !_hasError && mounted) {
       _controller.stop();
-      context.go(AppRoutes.onboarding);
+
+      // Check if user is logged in
+      final isLoggedIn = await _storageService.isLoggedIn();
+
+      if (isLoggedIn) {
+        // Load user data into sync provider
+        await refreshUserData(ref);
+
+        // User is logged in - go to home
+        if (mounted) {
+          context.go(AppRoutes.home);
+        }
+      } else {
+        // User is not logged in - check if they've seen onboarding
+        final hasSeenOnboarding = await _storageService.hasSeenOnboarding();
+
+        if (mounted) {
+          if (hasSeenOnboarding) {
+            // User has seen onboarding before - go to login
+            context.go(AppRoutes.login);
+          } else {
+            // First time user - show onboarding
+            context.go(AppRoutes.onboarding);
+          }
+        }
+      }
     }
   }
 
@@ -139,15 +192,51 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               ),
             ),
             const SizedBox(height: 48),
-            // Loading Indicator
-            SizedBox(
-              width: 40,
-              height: 40,
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                strokeWidth: 3,
+            // Loading Indicator or Error Message
+            if (_hasError) ...[
+              Text(
+                _errorMessage ?? 'Something went wrong',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _retryLoading,
+                icon: const Icon(Icons.refresh, color: AppColors.primaryColor),
+                label: const Text(
+                  'Refresh',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryColor,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  elevation: 2,
+                ),
+              ),
+            ] else ...[
+              const SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  strokeWidth: 3,
+                ),
+              ),
+            ],
           ],
         ),
       ),

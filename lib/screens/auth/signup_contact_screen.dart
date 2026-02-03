@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/registration_model.dart';
+import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
+import '../../utils/toastification.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
@@ -31,12 +33,12 @@ class _SignUpContactScreenState extends State<SignUpContactScreen> {
   bool _hasInitialized = false;
 
   // Auth service
-  final AuthService _authService = AuthService();
+  final AuthService _authService = AuthService(ApiClient().dio);
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     // Update personal data whenever route data changes
     // This ensures that if user goes back, edits personal info, and comes forward again,
     // we have the latest personal data
@@ -47,7 +49,8 @@ class _SignUpContactScreenState extends State<SignUpContactScreen> {
         if (extra['firstName'] != null) 'firstName': extra['firstName'],
         if (extra['lastName'] != null) 'lastName': extra['lastName'],
         if (extra['socialId'] != null) 'socialId': extra['socialId'],
-        if (extra['healthCardNo'] != null) 'healthCardNo': extra['healthCardNo'],
+        if (extra['healthCardNo'] != null)
+          'healthCardNo': extra['healthCardNo'],
         if (extra['tenantId'] != null) 'tenantId': extra['tenantId'],
       };
 
@@ -59,7 +62,7 @@ class _SignUpContactScreenState extends State<SignUpContactScreen> {
       // Only restore contact form fields on first initialization
       if (!_hasInitialized) {
         _hasInitialized = true;
-        
+
         // Restore contact form fields
         if (extra['email'] != null) {
           final email = extra['email'].toString();
@@ -101,11 +104,7 @@ class _SignUpContactScreenState extends State<SignUpContactScreen> {
   Future<void> _handleSignUp() async {
     if (_formKey.currentState!.validate()) {
       if (!_acceptTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please accept the terms and privacy policy'),
-          ),
-        );
+        errorSnack('Please accept the terms and privacy policy');
         return;
       }
 
@@ -146,13 +145,7 @@ class _SignUpContactScreenState extends State<SignUpContactScreen> {
           setState(() => _isLoading = false);
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString().replaceFirst('Exception: ', '')),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 4),
-              ),
-            );
+            errorSnack(e.toString().replaceFirst('Exception: ', ''));
           }
         }
       }

@@ -47,6 +47,10 @@ dependencies:
   # State Management
   flutter_riverpod: ^2.6.1
 
+  # Local Storage
+  shared_preferences: ^2.3.2
+  toastification: ^3.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

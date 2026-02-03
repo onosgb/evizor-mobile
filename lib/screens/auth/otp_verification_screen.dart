@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
+import '../../utils/toastification.dart';
+import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/app_routes.dart';
 import '../../widgets/custom_button.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
@@ -17,10 +20,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   int _timerSeconds = 60;
   bool _canResend = false;
   bool _isLoading = false;
+  bool _isResending = false;
   String _currentOTP = '';
 
   // Auth service
-  final AuthService _authService = AuthService();
+  final AuthService _authService = AuthService(ApiClient().dio);
 
   // Data from previous screen
   Map<String, dynamic>? _extraData;
@@ -67,23 +71,14 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     final otpCode = _otpController.text.trim();
 
     if (otpCode.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the complete 6-digit OTP code'),
-        ),
-      );
+      errorSnack('Please enter the complete 6-digit OTP code');
       return;
     }
 
     // Get email from registration data
     final email = _extraData?['registrationData']?['email'] as String?;
     if (email == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email not found. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      errorSnack('Email not found. Please try again.');
       return;
     }
 
@@ -91,40 +86,59 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
 
     try {
       // Call email verification API
-      final response = await _authService.verifyEmail(
-        email: email,
-        otpCode: '${otpCode}',
-      );
+      await _authService.verifyEmail(email: email, otpCode: otpCode);
 
       setState(() => _isLoading = false);
 
-      if (mounted) {}
+      if (mounted) {
+        successSnack('Email verified successfully');
+        context.go(AppRoutes.login);
+      }
     } catch (e) {
       setState(() => _isLoading = false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        errorSnack(e.toString().replaceFirst('Exception: ', ''));
       }
     }
   }
 
-  void _handleResend() {
+  Future<void> _handleResend() async {
+    // Get email from registration data
+    final email = _extraData?['registrationData']?['email'] as String?;
+    if (email == null) {
+      errorSnack('Email not found. Please try again.');
+      return;
+    }
+
     setState(() {
+      _isResending = true;
       _canResend = false;
       _timerSeconds = 60;
       _currentOTP = '';
       _otpController.clear();
     });
-    _startTimer();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('OTP code resent')));
+
+    try {
+      // Call resend email verification API
+      await _authService.resendEmailVerification(email: email);
+
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+        });
+        _startTimer();
+        successSnack('Verification code has been resent to your email');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+          _canResend = true; // Allow retry on error
+        });
+        errorSnack(e.toString().replaceFirst('Exception: ', ''));
+      }
+    }
   }
 
   String _getEmail() {
@@ -178,8 +192,9 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 40),
+                const SizedBox(height: 5),
                 // Icon
                 Container(
                   width: 80,
@@ -274,7 +289,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                       'Didn\'t receive the code? ',
                       style: TextStyle(color: Colors.grey[600]),
                     ),
-                    if (_canResend)
+                    if (_canResend && !_isResending)
                       TextButton(
                         onPressed: _handleResend,
                         child: const Text(
@@ -282,6 +297,17 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                           style: TextStyle(
                             color: AppColors.primaryColor,
                             fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    else if (_isResending)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primaryColor,
                           ),
                         ),
                       )
@@ -295,7 +321,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                       ),
                   ],
                 ),
-                const Spacer(),
+                const SizedBox(height: 48),
                 // Verify Button
                 CustomButton(
                   text: 'Verify',

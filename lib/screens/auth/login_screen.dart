@@ -1,20 +1,26 @@
+import 'package:evizor/utils/toastification.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 // import 'package:local_auth/local_auth.dart'; // Removed for design phase
+import '../../models/user_model.dart';
+import '../../providers/user_provider.dart';
+import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
+import '../../services/storage_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -23,7 +29,8 @@ class _LoginScreenState extends State<LoginScreen> {
   // final LocalAuthentication _localAuth = LocalAuthentication(); // Removed for design phase
 
   // Auth service
-  final AuthService _authService = AuthService();
+  final AuthService _authService = AuthService(ApiClient().dio);
+  final StorageService _storageService = StorageService();
 
   @override
   void dispose() {
@@ -47,17 +54,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (mounted) {
           // Extract response data (likely contains token and user info)
-          // TODO: Save token to secure storage for authenticated requests
           final data = response['data'];
           final token = data['accessToken'];
           final refreshToken = data['refreshToken'];
           final role = data['role'];
-          final user = data['user'];
+          final userData = data['user'] as Map<String, dynamic>?;
 
           // Check if user role exists (either directly in response or in user object)
-          final userRole = role ?? user?['role'] as String?;
+          final userRole = role ?? userData?['role'] as String?;
 
-          if (token == null) {
+          if (token == null || refreshToken == null) {
             throw Exception('Invalid login response');
           }
 
@@ -69,23 +75,58 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }
 
+          // Parse and save basic user info only (full profile fetched when needed)
+          if (userData != null) {
+            // Ensure role is included
+            if (userData['role'] == null && role != null) {
+              userData['role'] = role;
+            }
+
+            // Create user from basic info only
+            final user = User.fromBasicInfo(userData);
+            await _storageService.saveUser(user);
+
+            // Update user provider
+            if (mounted) {
+              ref.read(currentUserSyncProvider.notifier).state = user;
+            }
+          } else {
+            // If user data is not in response, create minimal user from available data
+            final basicUserData = {
+              'id': '', // Will be fetched later if needed
+              'email': _emailController.text.trim(),
+              'phoneNumber': '',
+              'role': role ?? 'PATIENT',
+              'firstName': '',
+              'lastName': '',
+              'socialId': '',
+              'healthCardNo': '',
+              'tenantId': '', // Will be fetched from profile if needed
+            };
+            final user = User.fromBasicInfo(basicUserData);
+            await _storageService.saveUser(user);
+
+            if (mounted) {
+              ref.read(currentUserSyncProvider.notifier).state = user;
+            }
+          }
+
+          // Save tokens to storage
+          await _storageService.saveTokens(token, refreshToken);
+
           // Set auth token in API client for future requests
-          // ApiClient().setAuthToken(token);
+          ApiClient().setAuthToken(token);
 
           // Navigate to home on success (only for patients)
-          context.go(AppRoutes.home);
+          if (mounted) {
+            context.go(AppRoutes.home);
+          }
         }
       } catch (e) {
         setState(() => _isLoading = false);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString().replaceFirst('Exception: ', '')),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
-          );
+          errorSnack(e.toString().replaceFirst('Exception: ', ''));
         }
       }
     }
@@ -93,9 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleBiometricLogin() async {
     // Biometric login temporarily disabled for design phase
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Biometric login coming soon')),
-    );
+    infoSnack('Biometric login coming soon');
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/toastification.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
@@ -35,9 +36,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       Future.delayed(const Duration(seconds: 1), () {
         setState(() => _isLoading = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password changed successfully')),
-          );
+          successSnack('Password changed successfully');
           context.pop();
         }
       });
@@ -50,7 +49,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           child: Form(
             key: _formKey,
             child: Column(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/toastification.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
@@ -34,9 +35,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       Future.delayed(const Duration(seconds: 1), () {
         setState(() => _isLoading = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password reset successfully')),
-          );
+          successSnack('Password reset successfully');
           context.go(AppRoutes.login);
         }
       });

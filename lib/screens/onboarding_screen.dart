@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../services/storage_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_routes.dart';
 
@@ -12,6 +13,7 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
+  final StorageService _storageService = StorageService();
   int _currentPage = 0;
 
   final List<OnboardingPageData> _pages = [
@@ -47,21 +49,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
   }
 
-  void _nextPage() {
+  void _nextPage() async {
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     } else {
+      // Mark onboarding as seen
+      await _storageService.setOnboardingSeen();
       // Navigate to login screen
-      context.go(AppRoutes.login);
+      if (mounted) {
+        context.go(AppRoutes.login);
+      }
     }
   }
 
-  void _skipOnboarding() {
+  void _skipOnboarding() async {
+    // Mark onboarding as seen
+    await _storageService.setOnboardingSeen();
     // Navigate to login screen
-    context.go(AppRoutes.login);
+    if (mounted) {
+      context.go(AppRoutes.login);
+    }
   }
 
   @override
