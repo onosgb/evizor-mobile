@@ -30,6 +30,7 @@ import '../screens/history/visit_history_screen.dart';
 import '../screens/history/visit_details_screen.dart';
 import '../screens/history/prescriptions_list_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/profile/update_profile_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/settings/change_password_screen.dart';
 import '../screens/settings/privacy_controls_screen.dart';
@@ -149,6 +150,11 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const ProfileScreen(),
         ),
       ],
+    ),
+    GoRoute(
+      path: '/profile/update',
+      name: 'update-profile',
+      builder: (context, state) => const UpdateProfileScreen(),
     ),
     GoRoute(
       path: '/notifications',

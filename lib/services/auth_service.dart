@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../models/registration_model.dart';
+import '../models/update_profile_request_model.dart';
 
 /// Authentication API service
 class AuthService {
@@ -14,20 +15,6 @@ class AuthService {
     try {
       // Log data before sending
       final requestData = request.toJson();
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('📤 PREPARING REGISTRATION REQUEST');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('Endpoint: POST /auth/register');
-      print('Request Data:');
-      requestData.forEach((key, value) {
-        // Mask password for security
-        if (key == 'password') {
-          print('  $key: ${'*' * (value.toString().length)}');
-        } else {
-          print('  $key: $value');
-        }
-      });
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _dio.post('/auth/register', data: requestData);
 
@@ -64,20 +51,6 @@ class AuthService {
     try {
       // Log data before sending
       final requestData = {'email': email, 'password': password};
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('📤 PREPARING LOGIN REQUEST');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('Endpoint: POST /auth/login');
-      print('Request Data:');
-      requestData.forEach((key, value) {
-        // Mask password for security
-        if (key == 'password') {
-          print('  $key: ${'*' * (value.toString().length)}');
-        } else {
-          print('  $key: $value');
-        }
-      });
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _dio.post('/auth/login', data: requestData);
 
@@ -112,9 +85,12 @@ class AuthService {
     try {
       final requestData = {'refreshToken': refreshToken};
 
-      final response = await _dio.post('/auth/refresh', data: requestData);
+      final response = await _dio.post(
+        '/auth/refresh-token',
+        data: requestData,
+      );
 
-      return response.data as Map<String, dynamic>;
+      return response as Map<String, dynamic>;
     } on DioException catch (e) {
       // Handle Dio errors
       if (e.response != null) {
@@ -142,7 +118,7 @@ class AuthService {
   /// Response: { "data": { ...full user profile... } }
   Future<Map<String, dynamic>> fetchUserProfile() async {
     try {
-      final response = await _dio.get('/auth/profile');
+      final response = await _dio.get('/users/my-profile');
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       // Handle Dio errors
@@ -161,6 +137,58 @@ class AuthService {
         );
       }
     } catch (e) {
+      throw Exception('An unexpected error occurred: ${e.toString()}');
+    }
+  }
+
+  /// Update user profile
+  ///
+  /// Endpoint: PUT /users/update-profile
+  /// This method sends all existing user information (except id, email, profilePhotoUrl) to the server
+  /// Request: UpdateProfileRequest model
+  /// Response: { "data": { ...updated user profile... } }
+  Future<Map<String, dynamic>> updateProfile(
+    UpdateProfileRequest request,
+  ) async {
+    try {
+      final response = await _dio.put(
+        '/users/update-profile',
+        data: request.toJson(),
+      );
+      // Handle both String and Map responses
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      } else if (response.data is String) {
+        return {'message': response.data as String};
+      } else {
+        return {'message': 'Profile updated successfully'};
+      }
+    } on DioException catch (e) {
+      // Handle Dio errors
+      if (e.response != null) {
+        // Server responded with error status
+        final errorData = e.response?.data;
+        String errorMessage;
+        if (errorData is Map<String, dynamic>) {
+          errorMessage =
+              errorData['message'] ??
+              'Failed to update profile. Please try again.';
+        } else if (errorData is String) {
+          errorMessage = errorData;
+        } else {
+          errorMessage = 'Failed to update profile. Please try again.';
+        }
+        throw Exception(errorMessage);
+      } else {
+        // Network or other error
+        throw Exception(
+          e.message ?? 'Network error. Please check your connection.',
+        );
+      }
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -355,6 +383,61 @@ class AuthService {
         } else {
           errorMessage =
               'Failed to resend password reset code. Please try again.';
+        }
+        throw Exception(errorMessage);
+      } else {
+        // Network or other error
+        throw Exception(
+          e.message ?? 'Network error. Please check your connection.',
+        );
+      }
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('An unexpected error occurred: ${e.toString()}');
+    }
+  }
+
+  /// Toggle Two-Factor Authentication
+  ///
+  /// Endpoint: PUT /users/update-profile
+  /// Request: { "isTwoFAEnabled": bool }
+  /// Response: { "data": { ...updated user profile... } }
+  Future<Map<String, dynamic>> toggle2FA({required bool enable}) async {
+    try {
+      final requestData = {'isTwoFAEnabled': enable};
+
+      final response = await _dio.put(
+        '/users/update-profile',
+        data: requestData,
+      );
+
+      // Handle both String and Map responses
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      } else if (response.data is String) {
+        return {'message': response.data as String};
+      } else {
+        return {
+          'message': '2FA ${enable ? 'enabled' : 'disabled'} successfully',
+        };
+      }
+    } on DioException catch (e) {
+      // Handle Dio errors
+      if (e.response != null) {
+        // Server responded with error status
+        final errorData = e.response?.data;
+        String errorMessage;
+        if (errorData is Map<String, dynamic>) {
+          errorMessage =
+              errorData['message'] ??
+              errorData['error'] ??
+              'Failed to toggle 2FA. Please try again.';
+        } else if (errorData is String) {
+          errorMessage = errorData;
+        } else {
+          errorMessage = 'Failed to toggle 2FA. Please try again.';
         }
         throw Exception(errorMessage);
       } else {

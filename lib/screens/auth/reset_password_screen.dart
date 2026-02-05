@@ -125,7 +125,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     });
 
     try {
-      print('resending password reset $_email');
       await _authService.resendPasswordReset(email: _email!);
 
       if (mounted) {
@@ -136,7 +135,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         successSnack('Password reset code has been resent to your email');
       }
     } catch (e) {
-      print(e);
       if (mounted) {
         setState(() {
           _isResending = false;

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/update_profile_request_model.dart';
 import '../models/user_model.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
@@ -14,63 +15,107 @@ final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService(ApiClient().dio);
 });
 
-/// Provider for current user data
-/// This provider loads user data from storage and can be watched throughout the app
-final currentUserProvider = FutureProvider<User?>((ref) async {
-  final storageService = ref.watch(storageServiceProvider);
-  return await storageService.getUser();
-});
+/// Main user provider using AsyncNotifier pattern
+/// This is the single source of truth for user state
+final currentUserProvider = AsyncNotifierProvider<UserNotifier, User?>(
+  UserNotifier.new,
+);
 
-/// Provider for synchronous access to user data (cached)
-/// Use this when you need immediate access without async/await
-/// Initializes from storage on first access
-final currentUserSyncProvider = StateProvider<User?>((ref) {
-  // Initialize from storage synchronously if possible
-  // Note: This will be null initially and should be populated via refreshUserData
-  return null;
-});
-
-/// Helper function to refresh user data from storage
-Future<void> refreshUserData(WidgetRef ref) async {
-  final storageService = ref.read(storageServiceProvider);
-  final user = await storageService.getUser();
-  ref.read(currentUserSyncProvider.notifier).state = user;
-}
-
-/// Fetch and update full user profile from API
-/// This should be called when user visits profile screen or updates profile
-Future<User?> fetchAndUpdateFullProfile(WidgetRef ref) async {
-  try {
-    final authService = ref.read(authServiceProvider);
-    final storageService = ref.read(storageServiceProvider);
-
-    // Fetch full profile from API
-    final response = await authService.fetchUserProfile();
-    final userData = response['data'] as Map<String, dynamic>?;
-
-    if (userData == null) {
-      return null;
-    }
-
-    // Get current user to preserve basic info if API doesn't return it
-    final currentUser = await storageService.getUser();
-
-    // Merge current user with full profile data
-    final updatedUserData = {...?currentUser?.toJson(), ...userData};
-
-    // Create user with full profile
-    final fullUser = User.fromJson(updatedUserData);
-
-    // Save updated user
-    await storageService.saveUser(fullUser);
-
-    // Update provider
-    ref.read(currentUserSyncProvider.notifier).state = fullUser;
-
-    return fullUser;
-  } catch (e) {
-    // Return current user if fetch fails
+/// User state notifier - handles all user-related operations
+class UserNotifier extends AsyncNotifier<User?> {
+  @override
+  Future<User?> build() async {
+    // Load user from storage on initialization
     final storageService = ref.read(storageServiceProvider);
     return await storageService.getUser();
+  }
+
+  /// Fetch and update user profile from API
+  Future<void> fetchProfile() async {
+    try {
+      final authService = ref.read(authServiceProvider);
+      final storageService = ref.read(storageServiceProvider);
+
+      // Fetch from API
+      final response = await authService.fetchUserProfile();
+      final userData = response as Map<String, dynamic>?;
+
+      if (userData == null) {
+        throw Exception('No user data received');
+      }
+
+      // Get current user to preserve basic info if API doesn't return it
+      final currentUser = await storageService.getUser();
+
+      // Merge current user with full profile data
+      final updatedUserData = {...?currentUser?.toJson(), ...userData};
+
+      // Create user from response
+      final user = User.fromJson(updatedUserData);
+
+      // Save to storage
+      await storageService.saveUser(user);
+
+      // Update state
+      state = AsyncData(user);
+    } catch (e, stackTrace) {
+      state = AsyncError(e, stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Update user profile
+  Future<void> updateProfile(UpdateProfileRequest request) async {
+    try {
+      final authService = ref.read(authServiceProvider);
+      final storageService = ref.read(storageServiceProvider);
+
+      // Call API to update profile
+      final response = await authService.updateProfile(request);
+
+      // Create user from API response
+      final updatedUser = User.fromJson(response);
+
+      // Save to storage
+      await storageService.saveUser(updatedUser);
+
+      // Update state
+      state = AsyncData(updatedUser);
+    } catch (e, stackTrace) {
+      state = AsyncError(e, stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Refresh user data from storage
+  Future<void> refreshFromStorage() async {
+    try {
+      final storageService = ref.read(storageServiceProvider);
+      final user = await storageService.getUser();
+      state = AsyncData(user);
+    } catch (e, stackTrace) {
+      state = AsyncError(e, stackTrace);
+    }
+  }
+
+  /// Set user state directly (for login, etc.)
+  Future<void> setUser(User user) async {
+    try {
+      final storageService = ref.read(storageServiceProvider);
+
+      // Save to storage
+      await storageService.saveUser(user);
+
+      // Update state
+      state = AsyncData(user);
+    } catch (e, stackTrace) {
+      state = AsyncError(e, stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Clear user state (for logout)
+  void clear() {
+    state = const AsyncData(null);
   }
 }

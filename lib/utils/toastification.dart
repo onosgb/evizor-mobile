@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:toastification/toastification.dart';
 
-errorSnack(String message) {
+void errorSnack(String message) {
   toastification.show(
     type: ToastificationType.error,
     style: ToastificationStyle.minimal,
@@ -23,7 +23,7 @@ errorSnack(String message) {
   );
 }
 
-infoSnack(String message) {
+void infoSnack(String message) {
   toastification.show(
     type: ToastificationType.info,
     style: ToastificationStyle.minimal,
@@ -45,7 +45,7 @@ infoSnack(String message) {
   );
 }
 
-successSnack(String message) {
+void successSnack(String message) {
   toastification.show(
     type: ToastificationType.success,
     style: ToastificationStyle.minimal,

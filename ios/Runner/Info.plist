@@ -64,5 +64,8 @@
 	<array>
 		<string>applinks:evizor.app</string>
 	</array>
+	<!-- Biometric Authentication (Face ID) -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>We use Face ID to provide secure and convenient login to your account</string>
 </dict>
 </plist>

@@ -168,7 +168,7 @@ class _SignUpContactScreenState extends State<SignUpContactScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
           _handleBackNavigation();
         }

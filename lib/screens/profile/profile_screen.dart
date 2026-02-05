@@ -6,12 +6,43 @@ import '../../services/api_client.dart';
 import '../../services/storage_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
+import '../../utils/toastification.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFullProfile();
+  }
+
+  Future<void> _fetchFullProfile() async {
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(currentUserProvider.notifier).fetchProfile();
+    } catch (e) {
+      if (mounted) {
+        errorSnack(
+          'Failed to load profile: ${e.toString().replaceFirst('Exception: ', '')}',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundGrey,
       body: SafeArea(
@@ -45,37 +76,47 @@ class ProfileScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                // Content
+                // Content with Pull-to-Refresh
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 90),
-                        // Personal Information Section
-                        _buildPersonalInformationSection(ref),
-                        const SizedBox(height: 16),
-                        // Medical History Section
-                        _buildMedicalHistorySection(),
-                        const SizedBox(height: 24),
-                        // Logout Button
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: _buildLogoutButton(context, ref),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                          onRefresh: _fetchFullProfile,
+                          color: AppColors.primaryColor,
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: Column(
+                              children: [
+                                const SizedBox(height: 90),
+                                // Personal Information Section
+                                _buildPersonalInformationSection(ref),
+                                const SizedBox(height: 16),
+                                // Medical History Section
+                                _buildMedicalHistorySection(),
+                                const SizedBox(height: 24),
+                                // Logout Button
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                  ),
+                                  child: _buildLogoutButton(context, ref),
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  ),
                 ),
               ],
             ),
             // User Profile Card - Positioned to overlap header
-            Positioned(
-              top: 80,
-              left: 0,
-              right: 0,
-              child: _buildUserProfileCard(context, ref),
-            ),
+            if (!_isLoading)
+              Positioned(
+                top: 80,
+                left: 0,
+                right: 0,
+                child: _buildUserProfileCard(context, ref),
+              ),
           ],
         ),
       ),
@@ -83,11 +124,11 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildUserProfileCard(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserSyncProvider);
+    final user = ref.watch(currentUserProvider).value;
     final userName = user?.fullName ?? 'John Doe';
-    final patientId = user?.id.isNotEmpty == true
-        ? '#P-${user!.id.substring(0, 8)}'
-        : '#P-2024-001';
+    final patientId = user?.healthCardNo.isNotEmpty == true
+        ? user!.healthCardNo
+        : 'Not set';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -142,13 +183,18 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
           // Edit Icon
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.primaryColor,
-              borderRadius: BorderRadius.circular(8),
+          GestureDetector(
+            onTap: () {
+              context.push(AppRoutes.updateProfile);
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.edit, color: Colors.white, size: 20),
             ),
-            child: const Icon(Icons.edit, color: Colors.white, size: 20),
           ),
         ],
       ),
@@ -156,13 +202,15 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildPersonalInformationSection(WidgetRef ref) {
-    final user = ref.watch(currentUserSyncProvider);
-    final email = user?.email ?? 'john.doe@email.com';
-    final phone = user?.phoneNumber ?? '+1 (555) 123-4567';
-    final dob = user?.dateOfBirth != null
-        ? '${user!.dateOfBirth!.day} ${_getMonthName(user.dateOfBirth!.month)}, ${user.dateOfBirth!.year}'
-        : 'Jan 15, 1990';
-    final gender = user?.gender ?? 'Male';
+    final user = ref.watch(currentUserProvider).value;
+    final email = user?.email ?? 'Not set';
+    final phone = user?.phoneNumber ?? 'Not set';
+    final dob = user?.dob != null
+        ? '${user!.dob!.day} ${_getMonthName(user.dob!.month)}, ${user.dob!.year}'
+        : 'Not set';
+    final gender = user?.gender ?? 'Not set';
+    final bloodGroup = user?.bloodGroup ?? 'Not set';
+    final socialId = user?.socialId ?? 'Not set';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -198,7 +246,9 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           _buildInfoRow('Gender', gender),
           const SizedBox(height: 12),
-          _buildInfoRow('Blood Group', 'O+'),
+          _buildInfoRow('Blood Group', bloodGroup),
+          const SizedBox(height: 12),
+          _buildInfoRow('Social ID', socialId),
         ],
       ),
     );
@@ -355,7 +405,7 @@ class ProfileScreen extends ConsumerWidget {
             await storageService.logout(); // Clears tokens and user data
 
             // Clear user provider state
-            ref.read(currentUserSyncProvider.notifier).state = null;
+            ref.read(currentUserProvider.notifier).clear();
 
             // Remove auth token from API client
             ApiClient().removeAuthToken();

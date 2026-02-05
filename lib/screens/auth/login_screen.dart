@@ -2,11 +2,11 @@ import 'package:evizor/utils/toastification.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-// import 'package:local_auth/local_auth.dart'; // Removed for design phase
 import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
+import '../../services/biometric_service.dart';
 import '../../services/storage_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
@@ -26,11 +26,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
-  // final LocalAuthentication _localAuth = LocalAuthentication(); // Removed for design phase
 
-  // Auth service
+  // Services
   final AuthService _authService = AuthService(ApiClient().dio);
   final StorageService _storageService = StorageService();
+  final BiometricService _biometricService = BiometricService();
 
   @override
   void dispose() {
@@ -84,11 +84,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
             // Create user from basic info only
             final user = User.fromBasicInfo(userData);
-            await _storageService.saveUser(user);
 
             // Update user provider
             if (mounted) {
-              ref.read(currentUserSyncProvider.notifier).state = user;
+              await ref.read(currentUserProvider.notifier).setUser(user);
             }
           } else {
             // If user data is not in response, create minimal user from available data
@@ -104,10 +103,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               'tenantId': '', // Will be fetched from profile if needed
             };
             final user = User.fromBasicInfo(basicUserData);
-            await _storageService.saveUser(user);
 
             if (mounted) {
-              ref.read(currentUserSyncProvider.notifier).state = user;
+              await ref.read(currentUserProvider.notifier).setUser(user);
             }
           }
 
@@ -116,6 +114,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
           // Set auth token in API client for future requests
           ApiClient().setAuthToken(token);
+
+          // Prompt to enable biometric login if not already enabled
+          final biometricEnabled = await _biometricService.isBiometricEnabled();
+          final canUseBiometric = await _biometricService.canUseBiometrics();
+
+          if (mounted && !biometricEnabled && canUseBiometric) {
+            await _promptEnableBiometric();
+          }
 
           // Navigate to home on success (only for patients)
           if (mounted) {
@@ -133,8 +139,121 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleBiometricLogin() async {
-    // Biometric login temporarily disabled for design phase
-    infoSnack('Biometric login coming soon');
+    try {
+      // Check if biometric is enabled
+      final isEnabled = await _biometricService.isBiometricEnabled();
+      if (!isEnabled) {
+        errorSnack('Biometric login is not enabled');
+        return;
+      }
+
+      // Authenticate with biometrics
+      final authenticated = await _biometricService.authenticate(
+        reason: 'Authenticate to login to your account',
+      );
+
+      if (!authenticated) {
+        errorSnack('Biometric authentication failed');
+        return;
+      }
+
+      // Get stored credentials
+      final credentials = await _biometricService.getStoredCredentials();
+      if (credentials == null) {
+        errorSnack('No stored credentials found');
+        await _biometricService.disableBiometric();
+        return;
+      }
+
+      setState(() => _isLoading = true);
+
+      // Login with stored credentials
+      final response = await _authService.login(
+        email: credentials['email']!,
+        password: credentials['password']!,
+      );
+
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        // Extract response data
+        final data = response['data'];
+        final token = data['accessToken'];
+        final refreshToken = data['refreshToken'];
+        final role = data['role'];
+        final userData = data['user'] as Map<String, dynamic>?;
+
+        final userRole = role ?? userData?['role'] as String?;
+
+        if (token == null || refreshToken == null) {
+          throw Exception('Invalid login response');
+        }
+
+        // Validate patient role
+        if (userRole == null || userRole.toUpperCase() != 'PATIENT') {
+          throw Exception(
+            'Access denied. This mobile app is only available for patients.',
+          );
+        }
+
+        // Parse and save user info
+        if (userData != null) {
+          if (userData['role'] == null && role != null) {
+            userData['role'] = role;
+          }
+          final user = User.fromBasicInfo(userData);
+          if (mounted) {
+            await ref.read(currentUserProvider.notifier).setUser(user);
+          }
+        }
+
+        // Save tokens
+        await _storageService.saveTokens(token, refreshToken);
+        ApiClient().setAuthToken(token);
+
+        // Navigate to home
+        if (mounted) {
+          context.go(AppRoutes.home);
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        errorSnack(e.toString().replaceFirst('Exception: ', ''));
+      }
+    }
+  }
+
+  Future<void> _promptEnableBiometric() async {
+    final shouldEnable = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enable Biometric Login?'),
+        content: const Text(
+          'Would you like to enable biometric login for faster access next time?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not Now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldEnable == true) {
+      await _biometricService.saveCredentials(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (mounted) {
+        infoSnack('Biometric login enabled successfully');
+      }
+    }
   }
 
   @override
@@ -169,14 +288,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 40),
                 // Email/Phone Input
                 CustomTextField(
-                  label: 'Email or Phone',
-                  hint: 'Enter your email or phone number',
+                  label: 'Email',
+                  hint: 'Enter your email',
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   prefixIcon: const Icon(Icons.email_outlined),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your email or phone';
+                      return 'Please enter your email';
                     }
                     return null;
                   },
@@ -230,46 +349,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: _handleLogin,
                   isLoading: _isLoading,
                 ),
-                // Biometric Login - Temporarily disabled for design phase
-                // FutureBuilder<bool>(
-                //   future: _localAuth.canCheckBiometrics,
-                //   builder: (context, snapshot) {
-                //     if (snapshot.data == true) {
-                //       return Column(
-                //         children: [
-                //           Row(
-                //             children: [
-                //               Expanded(child: Divider(color: Colors.grey[300])),
-                //               Padding(
-                //                 padding: const EdgeInsets.symmetric(
-                //                   horizontal: 16,
-                //                 ),
-                //                 child: Text(
-                //                   'OR',
-                //                   style: TextStyle(color: Colors.grey[600]),
-                //                 ),
-                //               ),
-                //               Expanded(child: Divider(color: Colors.grey[300])),
-                //             ],
-                //           ),
-                //           const SizedBox(height: 24),
-                //           OutlinedButton.icon(
-                //             onPressed: _handleBiometricLogin,
-                //             icon: const Icon(Icons.fingerprint),
-                //             label: const Text('Login with Biometric'),
-                //             style: OutlinedButton.styleFrom(
-                //               padding: const EdgeInsets.symmetric(vertical: 16),
-                //               shape: RoundedRectangleBorder(
-                //                 borderRadius: BorderRadius.circular(12),
-                //               ),
-                //             ),
-                //           ),
-                //         ],
-                //       );
-                //     }
-                //     return const SizedBox.shrink();
-                //   },
-                // ),
+                // Biometric Login Icon
+                FutureBuilder<bool>(
+                  future: _biometricService.isBiometricEnabled(),
+                  builder: (context, snapshot) {
+                    if (snapshot.data == true) {
+                      return Column(
+                        children: [
+                          const SizedBox(height: 24),
+                          Center(
+                            child: InkWell(
+                              onTap: _handleBiometricLogin,
+                              borderRadius: BorderRadius.circular(30),
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.primaryColor.withValues(
+                                    alpha: 0.1,
+                                  ),
+                                  border: Border.all(
+                                    color: AppColors.primaryColor,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.fingerprint,
+                                  size: 32,
+                                  color: AppColors.primaryColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 const SizedBox(height: 32),
                 // Sign Up Link
                 Row(

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/tenant_provider.dart';
-import '../providers/user_provider.dart';
 import '../services/storage_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_routes.dart';
@@ -108,9 +107,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       final isLoggedIn = await _storageService.isLoggedIn();
 
       if (isLoggedIn) {
-        // Load user data into sync provider
-        await refreshUserData(ref);
-
         // User is logged in - go to home
         if (mounted) {
           context.go(AppRoutes.home);

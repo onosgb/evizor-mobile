@@ -45,6 +45,7 @@ class AppRoutes {
 
   // Profile & Settings
   static const String profile = '/profile';
+  static const String updateProfile = '/profile/update';
   static const String settings = '/settings';
   static const String changePassword = '/settings/change-password';
   static const String privacyControls = '/settings/privacy';

@@ -9,11 +9,13 @@ class User {
   final String socialId;
   final String healthCardNo;
   final String tenantId; // Province/location
+  final bool isTwoFAEnabled;
 
   // Full profile info (fetched when needed)
-  final DateTime? dateOfBirth;
+  final DateTime? dob;
   final String? gender;
   final String? address;
+  final String? bloodGroup;
   final String? profilePhotoUrl;
 
   User({
@@ -26,9 +28,11 @@ class User {
     required this.socialId,
     required this.healthCardNo,
     required this.tenantId,
-    this.dateOfBirth,
+    this.isTwoFAEnabled = false,
+    this.dob,
     this.gender,
     this.address,
+    this.bloodGroup,
     this.profilePhotoUrl,
   });
 
@@ -36,39 +40,31 @@ class User {
   String get fullName => '$firstName $lastName'.trim();
 
   /// Create User from JSON map (handles both basic and full profile)
+  /// Database always returns camelCase format
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] as String? ?? json['_id'] as String? ?? '',
       email: json['email'] as String? ?? '',
-      phoneNumber:
-          json['phoneNumber'] as String? ?? json['phone'] as String? ?? '',
+      phoneNumber: json['phoneNumber'] as String? ?? '',
       role: json['role'] as String? ?? '',
-      firstName:
-          json['firstName'] as String? ?? json['first_name'] as String? ?? '',
-      lastName:
-          json['lastName'] as String? ?? json['last_name'] as String? ?? '',
-      socialId:
-          json['socialId'] as String? ?? json['social_id'] as String? ?? '',
-      healthCardNo:
-          json['healthCardNo'] as String? ??
-          json['health_card_no'] as String? ??
-          '',
-      tenantId:
-          json['tenantId'] as String? ?? json['tenant_id'] as String? ?? '',
-      dateOfBirth: json['dateOfBirth'] != null
-          ? DateTime.tryParse(json['dateOfBirth'].toString())
-          : json['date_of_birth'] != null
-          ? DateTime.tryParse(json['date_of_birth'].toString())
+      firstName: json['firstName'] as String? ?? '',
+      lastName: json['lastName'] as String? ?? '',
+      socialId: json['socialId'] as String? ?? '',
+      healthCardNo: json['healthCardNo'] as String? ?? '',
+      tenantId: json['tenantId'] as String? ?? '',
+      isTwoFAEnabled: json['isTwoFAEnabled'] as bool? ?? false,
+      dob: json['dob'] != null
+          ? DateTime.tryParse(json['dob'].toString())
           : null,
       gender: json['gender'] as String?,
       address: json['address'] as String?,
-      profilePhotoUrl:
-          json['profilePhotoUrl'] as String? ??
-          json['profile_photo_url'] as String?,
+      bloodGroup: json['bloodGroup'] as String?,
+      profilePhotoUrl: json['profilePhotoUrl'] as String?,
     );
   }
 
   /// Create User from basic login info only
+  /// Database always returns camelCase format
   factory User.fromBasicInfo(Map<String, dynamic> json) {
     return User(
       id: json['id'] as String? ?? json['_id'] as String? ?? '',
@@ -79,8 +75,8 @@ class User {
       lastName: json['lastName'] as String? ?? '',
       socialId: json['socialId'] as String? ?? '',
       healthCardNo: json['healthCardNo'] as String? ?? '',
-      tenantId:
-          json['tenantId'] as String? ?? json['tenant_id'] as String? ?? '',
+      tenantId: json['tenantId'] as String? ?? '',
+      isTwoFAEnabled: json['isTwoFAEnabled'] as bool? ?? false,
     );
   }
 
@@ -96,9 +92,11 @@ class User {
       'socialId': socialId,
       'healthCardNo': healthCardNo,
       'tenantId': tenantId,
-      'dateOfBirth': dateOfBirth?.toIso8601String(),
+      'isTwoFAEnabled': isTwoFAEnabled,
+      'dob': dob?.toIso8601String(),
       'gender': gender,
       'address': address,
+      'bloodGroup': bloodGroup,
       'profilePhotoUrl': profilePhotoUrl,
     };
   }
@@ -114,9 +112,11 @@ class User {
     String? socialId,
     String? healthCardNo,
     String? tenantId,
-    DateTime? dateOfBirth,
+    bool? isTwoFAEnabled,
+    DateTime? dob,
     String? gender,
     String? address,
+    String? bloodGroup,
     String? profilePhotoUrl,
   }) {
     return User(
@@ -129,14 +129,15 @@ class User {
       socialId: socialId ?? this.socialId,
       healthCardNo: healthCardNo ?? this.healthCardNo,
       tenantId: tenantId ?? this.tenantId,
-      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      isTwoFAEnabled: isTwoFAEnabled ?? this.isTwoFAEnabled,
+      dob: dob ?? this.dob,
       gender: gender ?? this.gender,
       address: address ?? this.address,
+      bloodGroup: bloodGroup ?? this.bloodGroup,
       profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
     );
   }
 
   /// Check if full profile data is available
-  bool get hasFullProfile =>
-      dateOfBirth != null || gender != null || address != null;
+  bool get hasFullProfile => dob != null || gender != null || address != null;
 }

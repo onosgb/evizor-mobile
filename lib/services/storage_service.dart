@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
+import 'biometric_service.dart';
 
 /// Service for managing local storage (tokens, onboarding status, etc.)
 class StorageService {
@@ -106,5 +107,12 @@ class StorageService {
   Future<void> logout() async {
     await clearTokens();
     await clearUser();
+    // Also clear biometric data on logout
+    try {
+      final BiometricService biometricService = BiometricService();
+      await biometricService.clearBiometricData();
+    } catch (_) {
+      // Silently fail if biometric service is not available
+    }
   }
 }

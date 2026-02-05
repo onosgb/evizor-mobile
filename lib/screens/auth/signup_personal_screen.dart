@@ -247,7 +247,7 @@ class _SignUpPersonalScreenState extends ConsumerState<SignUpPersonalScreen> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<Tenant>(
-              value: _selectedTenant,
+              initialValue: _selectedTenant,
               decoration: InputDecoration(
                 hintText: 'Select your location',
                 prefixIcon: const Icon(Icons.location_on_outlined),
