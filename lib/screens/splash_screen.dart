@@ -170,7 +170,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             const SizedBox(height: 32),
             // App Name
             const Text(
-              'HealthCare',
+              'Evizor Care',
               style: TextStyle(
                 fontSize: 36,
                 fontWeight: FontWeight.bold,

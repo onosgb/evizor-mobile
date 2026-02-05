@@ -393,10 +393,16 @@ class _UpdateProfileScreenState extends ConsumerState<UpdateProfileScreen> {
                 // Address
                 CustomTextField(
                   label: 'Address',
-                  hint: 'Enter your address (optional)',
+                  hint: 'Enter your address',
                   controller: _addressController,
                   maxLines: 2,
                   prefixIcon: const Icon(Icons.location_on_outlined),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your address';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 40),
                 // Update Button

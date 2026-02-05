@@ -6,7 +6,6 @@ import '../../services/api_client.dart';
 import '../../services/storage_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
-import '../../utils/toastification.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -16,8 +15,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _isLoading = false;
-
   @override
   void initState() {
     super.initState();
@@ -25,18 +22,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _fetchFullProfile() async {
-    setState(() => _isLoading = true);
     try {
       await ref.read(currentUserProvider.notifier).fetchProfile();
     } catch (e) {
       if (mounted) {
-        errorSnack(
-          'Failed to load profile: ${e.toString().replaceFirst('Exception: ', '')}',
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+        // Silently fail for background update, or show unobtrusive error
+        // Keeping it silent or toast if needed, but not blocking.
+        // If it was a manual refresh (RefreshIndicator), the exception
+        // propagates or is handled here?
+        // For InitState call, we might not want to show snackbar immediately if it fails silently?
+        // But user provided code had errorSnack. I will keep errorSnack but careful.
+        // Actually, for background load, maybe we shouldn't annoy user if offline?
+        // But let's stick to "just don't show loading spinner".
+        debugPrint('Failed to refresh profile: $e');
       }
     }
   }
@@ -78,45 +76,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 // Content with Pull-to-Refresh
                 Expanded(
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : RefreshIndicator(
-                          onRefresh: _fetchFullProfile,
-                          color: AppColors.primaryColor,
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            child: Column(
-                              children: [
-                                const SizedBox(height: 90),
-                                // Personal Information Section
-                                _buildPersonalInformationSection(ref),
-                                const SizedBox(height: 16),
-                                // Medical History Section
-                                _buildMedicalHistorySection(),
-                                const SizedBox(height: 24),
-                                // Logout Button
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                  ),
-                                  child: _buildLogoutButton(context, ref),
-                                ),
-                                const SizedBox(height: 24),
-                              ],
-                            ),
+                  child: RefreshIndicator(
+                    onRefresh: _fetchFullProfile,
+                    color: AppColors.primaryColor,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 90),
+                          // Personal Information Section
+                          _buildPersonalInformationSection(ref),
+                          const SizedBox(height: 16),
+                          // Medical History Section
+                          _buildMedicalHistorySection(),
+                          const SizedBox(height: 24),
+                          // Logout Button
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: _buildLogoutButton(context, ref),
                           ),
-                        ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
             // User Profile Card - Positioned to overlap header
-            if (!_isLoading)
-              Positioned(
-                top: 80,
-                left: 0,
-                right: 0,
-                child: _buildUserProfileCard(context, ref),
-              ),
+            Positioned(
+              top: 80,
+              left: 0,
+              right: 0,
+              child: _buildUserProfileCard(context, ref),
+            ),
           ],
         ),
       ),

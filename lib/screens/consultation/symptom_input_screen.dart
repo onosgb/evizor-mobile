@@ -19,7 +19,8 @@ class SymptomInputScreen extends ConsumerStatefulWidget {
 class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
   final _descriptionController = TextEditingController();
 
-  final Set<String> _selectedSymptoms = {};
+  // Store selected components by ID
+  final Set<String> _selectedSymptomIds = {};
   String _duration = '';
   double _severity = 5.0;
 
@@ -136,18 +137,18 @@ class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: symptoms.map((symptom) {
-                                final isSelected = _selectedSymptoms.contains(
-                                  symptom,
+                                final isSelected = _selectedSymptomIds.contains(
+                                  symptom.id,
                                 );
                                 return FilterChip(
-                                  label: Text(symptom),
+                                  label: Text(symptom.name),
                                   selected: isSelected,
                                   onSelected: (selected) {
                                     setState(() {
                                       if (selected) {
-                                        _selectedSymptoms.add(symptom);
+                                        _selectedSymptomIds.add(symptom.id);
                                       } else {
-                                        _selectedSymptoms.remove(symptom);
+                                        _selectedSymptomIds.remove(symptom.id);
                                       }
                                     });
                                   },
@@ -266,7 +267,7 @@ class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
                                 ? null
                                 : () async {
                                     // Validate inputs
-                                    if (_selectedSymptoms.isEmpty) {
+                                    if (_selectedSymptomIds.isEmpty) {
                                       errorSnack(
                                         'Please select at least one symptom',
                                       );
@@ -296,7 +297,7 @@ class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
                                                 .notifier,
                                           )
                                           .createAppointment(
-                                            symptomIds: _selectedSymptoms
+                                            symptomIds: _selectedSymptomIds
                                                 .toList(),
                                             description: _descriptionController
                                                 .text

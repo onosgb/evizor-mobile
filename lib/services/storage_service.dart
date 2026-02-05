@@ -107,12 +107,5 @@ class StorageService {
   Future<void> logout() async {
     await clearTokens();
     await clearUser();
-    // Also clear biometric data on logout
-    try {
-      final BiometricService biometricService = BiometricService();
-      await biometricService.clearBiometricData();
-    } catch (_) {
-      // Silently fail if biometric service is not available
-    }
   }
 }

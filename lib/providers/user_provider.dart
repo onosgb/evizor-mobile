@@ -37,18 +37,13 @@ class UserNotifier extends AsyncNotifier<User?> {
       final storageService = ref.read(storageServiceProvider);
 
       // Fetch from API
-      final response = await authService.fetchUserProfile();
-      final userData = response as Map<String, dynamic>?;
-
-      if (userData == null) {
-        throw Exception('No user data received');
-      }
+      final userData = await authService.fetchUserProfile();
 
       // Get current user to preserve basic info if API doesn't return it
       final currentUser = await storageService.getUser();
 
       // Merge current user with full profile data
-      final updatedUserData = {...?currentUser?.toJson(), ...userData};
+      final updatedUserData = {...?currentUser?.toJson(), ...userData.toJson()};
 
       // Create user from response
       final user = User.fromJson(updatedUserData);
@@ -71,11 +66,7 @@ class UserNotifier extends AsyncNotifier<User?> {
       final storageService = ref.read(storageServiceProvider);
 
       // Call API to update profile
-      final response = await authService.updateProfile(request);
-
-      // Create user from API response
-      final updatedUser = User.fromJson(response);
-
+      final updatedUser = await authService.updateProfile(request);
       // Save to storage
       await storageService.saveUser(updatedUser);
 

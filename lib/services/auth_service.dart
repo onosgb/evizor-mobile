@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:evizor/models/user_model.dart';
 import '../models/registration_model.dart';
 import '../models/update_profile_request_model.dart';
 
@@ -116,10 +117,11 @@ class AuthService {
   ///
   /// Endpoint: GET /auth/profile or GET /users/me
   /// Response: { "data": { ...full user profile... } }
-  Future<Map<String, dynamic>> fetchUserProfile() async {
+  Future<User> fetchUserProfile() async {
     try {
       final response = await _dio.get('/users/my-profile');
-      return response.data as Map<String, dynamic>;
+      final data = response.data['data'];
+      return User.fromJson(data);
     } on DioException catch (e) {
       // Handle Dio errors
       if (e.response != null) {
@@ -147,44 +149,15 @@ class AuthService {
   /// This method sends all existing user information (except id, email, profilePhotoUrl) to the server
   /// Request: UpdateProfileRequest model
   /// Response: { "data": { ...updated user profile... } }
-  Future<Map<String, dynamic>> updateProfile(
-    UpdateProfileRequest request,
-  ) async {
+  Future<User> updateProfile(UpdateProfileRequest request) async {
     try {
       final response = await _dio.put(
         '/users/update-profile',
         data: request.toJson(),
       );
-      // Handle both String and Map responses
-      if (response.data is Map<String, dynamic>) {
-        return response.data as Map<String, dynamic>;
-      } else if (response.data is String) {
-        return {'message': response.data as String};
-      } else {
-        return {'message': 'Profile updated successfully'};
-      }
+      return User.fromJson(response.data['data']);
     } on DioException catch (e) {
-      // Handle Dio errors
-      if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        String errorMessage;
-        if (errorData is Map<String, dynamic>) {
-          errorMessage =
-              errorData['message'] ??
-              'Failed to update profile. Please try again.';
-        } else if (errorData is String) {
-          errorMessage = errorData;
-        } else {
-          errorMessage = 'Failed to update profile. Please try again.';
-        }
-        throw Exception(errorMessage);
-      } else {
-        // Network or other error
-        throw Exception(
-          e.message ?? 'Network error. Please check your connection.',
-        );
-      }
+      throw Exception(e.response?.data['message']);
     } catch (e) {
       if (e is Exception) {
         rethrow;
