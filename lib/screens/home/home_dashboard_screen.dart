@@ -62,13 +62,13 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                             Text(
                               _getGreeting(),
                               style: const TextStyle(
-                                fontSize: 28,
+                                fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.textPrimary,
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Text('👋', style: TextStyle(fontSize: 28)),
+                            const Text('👋', style: TextStyle(fontSize: 24)),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -197,7 +197,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                         const Text(
                           'Upcoming Appointment',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
                           ),

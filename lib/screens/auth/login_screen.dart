@@ -2,7 +2,6 @@ import 'package:evizor/utils/toastification.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
@@ -53,60 +52,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         setState(() => _isLoading = false);
 
         if (mounted) {
-          // Extract response data (likely contains token and user info)
-          final data = response['data'];
-          final token = data['accessToken'];
-          final refreshToken = data['refreshToken'];
-          final role = data['role'];
-          final userData = data['user'] as Map<String, dynamic>?;
-
-          // Check if user role exists (either directly in response or in user object)
-          final userRole = role ?? userData?['role'] as String?;
-
-          if (token == null || refreshToken == null) {
-            throw Exception('Invalid login response');
-          }
+          // Extract data from LoginResponse model
+          final token = response.accessToken;
+          final refreshToken = response.refreshToken;
+          final user = response.user;
 
           // Validate that only patients can login on mobile app
-          if (userRole == null || userRole.toUpperCase() != 'PATIENT') {
+          if (user.role.toUpperCase() != 'PATIENT') {
             throw Exception(
               'Access denied. This mobile app is only available for patients. '
               'Please use the appropriate platform for your account type.',
             );
           }
 
-          // Parse and save basic user info only (full profile fetched when needed)
-          if (userData != null) {
-            // Ensure role is included
-            if (userData['role'] == null && role != null) {
-              userData['role'] = role;
-            }
-
-            // Create user from basic info only
-            final user = User.fromBasicInfo(userData);
-
-            // Update user provider
-            if (mounted) {
-              await ref.read(currentUserProvider.notifier).setUser(user);
-            }
-          } else {
-            // If user data is not in response, create minimal user from available data
-            final basicUserData = {
-              'id': '', // Will be fetched later if needed
-              'email': _emailController.text.trim(),
-              'phoneNumber': '',
-              'role': role ?? 'PATIENT',
-              'firstName': '',
-              'lastName': '',
-              'socialId': '',
-              'healthCardNo': '',
-              'tenantId': '', // Will be fetched from profile if needed
-            };
-            final user = User.fromBasicInfo(basicUserData);
-
-            if (mounted) {
-              await ref.read(currentUserProvider.notifier).setUser(user);
-            }
+          // Update user provider with the user from login response
+          if (mounted) {
+            await ref.read(currentUserProvider.notifier).setUser(user);
           }
 
           // Save tokens to storage
@@ -115,11 +76,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           // Set auth token in API client for future requests
           ApiClient().setAuthToken(token);
 
-          // Prompt to enable biometric login if not already enabled
+          // Prompt to enable biometric login if not already enabled or dismissed
           final biometricEnabled = await _biometricService.isBiometricEnabled();
           final canUseBiometric = await _biometricService.canUseBiometrics();
+          final hasUserDismissed = await _biometricService
+              .hasUserDismissedPrompt();
 
-          if (mounted && !biometricEnabled && canUseBiometric) {
+          if (mounted &&
+              !biometricEnabled &&
+              canUseBiometric &&
+              !hasUserDismissed) {
             await _promptEnableBiometric();
           }
 
@@ -176,35 +142,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() => _isLoading = false);
 
       if (mounted) {
-        // Extract response data
-        final data = response['data'];
-        final token = data['accessToken'];
-        final refreshToken = data['refreshToken'];
-        final role = data['role'];
-        final userData = data['user'] as Map<String, dynamic>?;
-
-        final userRole = role ?? userData?['role'] as String?;
-
-        if (token == null || refreshToken == null) {
-          throw Exception('Invalid login response');
-        }
+        // Extract data from LoginResponse model
+        final token = response.accessToken;
+        final refreshToken = response.refreshToken;
+        final user = response.user;
 
         // Validate patient role
-        if (userRole == null || userRole.toUpperCase() != 'PATIENT') {
+        if (user.role.toUpperCase() != 'PATIENT') {
           throw Exception(
             'Access denied. This mobile app is only available for patients.',
           );
         }
 
-        // Parse and save user info
-        if (userData != null) {
-          if (userData['role'] == null && role != null) {
-            userData['role'] = role;
-          }
-          final user = User.fromBasicInfo(userData);
-          if (mounted) {
-            await ref.read(currentUserProvider.notifier).setUser(user);
-          }
+        // Update user provider with the user from login response
+        if (mounted) {
+          await ref.read(currentUserProvider.notifier).setUser(user);
         }
 
         // Save tokens
@@ -253,6 +205,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         infoSnack('Biometric login enabled successfully');
       }
+    } else if (shouldEnable == false) {
+      // User clicked "Not Now", mark as dismissed so we don't ask again
+      await _biometricService.markPromptAsDismissed();
     }
   }
 

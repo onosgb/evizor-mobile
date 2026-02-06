@@ -133,31 +133,7 @@ class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
                                 ],
                               ),
                             )
-                          : Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: symptoms.map((symptom) {
-                                final isSelected = _selectedSymptomIds.contains(
-                                  symptom.id,
-                                );
-                                return FilterChip(
-                                  label: Text(symptom.name),
-                                  selected: isSelected,
-                                  onSelected: (selected) {
-                                    setState(() {
-                                      if (selected) {
-                                        _selectedSymptomIds.add(symptom.id);
-                                      } else {
-                                        _selectedSymptomIds.remove(symptom.id);
-                                      }
-                                    });
-                                  },
-                                  selectedColor: AppColors.primaryColor
-                                      .withValues(alpha: 0.2),
-                                  checkmarkColor: AppColors.primaryColor,
-                                );
-                              }).toList(),
-                            ),
+                          : _buildSymptomCarousel(symptoms),
                       const SizedBox(height: 32),
                       // Description
                       CustomTextField(
@@ -290,35 +266,24 @@ class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
                                       return;
                                     }
 
-                                    try {
-                                      await ref
-                                          .read(
-                                            appointmentNotifierProvider
-                                                .notifier,
-                                          )
-                                          .createAppointment(
-                                            symptomIds: _selectedSymptomIds
-                                                .toList(),
-                                            description: _descriptionController
-                                                .text
-                                                .trim(),
-                                            duration: _duration,
-                                            severity: _severity.round(),
-                                          );
+                                    // Save draft appointment data (don't submit to database yet)
+                                    ref
+                                        .read(
+                                          appointmentNotifierProvider.notifier,
+                                        )
+                                        .saveDraftAppointment(
+                                          symptomIds: _selectedSymptomIds
+                                              .toList(),
+                                          description: _descriptionController
+                                              .text
+                                              .trim(),
+                                          duration: _duration,
+                                          severity: _severity.round(),
+                                        );
 
-                                      if (context.mounted) {
-                                        successSnack(
-                                          'Appointment created successfully',
-                                        );
-                                        context.push(AppRoutes.uploadFiles);
-                                      }
-                                    } catch (e) {
-                                      if (context.mounted) {
-                                        errorSnack(
-                                          appointmentState.error ??
-                                              'Failed to create appointment. Please try again.',
-                                        );
-                                      }
+                                    // Navigate to upload files screen
+                                    if (context.mounted) {
+                                      context.push(AppRoutes.uploadFiles);
                                     }
                                   },
                           );
@@ -332,6 +297,76 @@ class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildSymptomCarousel(List<dynamic> symptoms) {
+    return Column(
+      children: [
+        // Horizontal scrollable symptoms with peek effect
+        SizedBox(
+          height: 60,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: symptoms.length,
+            itemExtent: 140, // Fixed width for each symptom
+            itemBuilder: (context, index) {
+              final symptom = symptoms[index];
+              final isSelected = _selectedSymptomIds.contains(symptom.id);
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      symptom.name,
+                      style: const TextStyle(fontSize: 13),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedSymptomIds.add(symptom.id);
+                      } else {
+                        _selectedSymptomIds.remove(symptom.id);
+                      }
+                    });
+                  },
+                  selectedColor: AppColors.primaryColor.withValues(alpha: 0.2),
+                  checkmarkColor: AppColors.primaryColor,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Selected symptoms counter
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '${_selectedSymptomIds.length} symptom${_selectedSymptomIds.length == 1 ? '' : 's'} selected',
+            style: const TextStyle(
+              color: AppColors.primaryColor,
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

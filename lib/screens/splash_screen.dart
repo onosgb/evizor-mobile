@@ -70,7 +70,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       if (mounted) {
         setState(() {
           _hasError = true;
-          _errorMessage = 'Failed to load location data';
+          _errorMessage = 'Failed to load app settings';
           _tenantsLoaded = false; // Ensure navigation is blocked
         });
         _controller.stop(); // Stop animation when error occurs
@@ -167,10 +167,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 );
               },
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             // App Name
             const Text(
-              'Evizor Care',
+              'Evizor',
               style: TextStyle(
                 fontSize: 36,
                 fontWeight: FontWeight.bold,

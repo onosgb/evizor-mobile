@@ -1,19 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/consultation_provider.dart';
+import '../../providers/symptoms_provider.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
+import '../../utils/toastification.dart';
 import '../../widgets/custom_button.dart';
 
-class ReviewConfirmScreen extends StatefulWidget {
+class ReviewConfirmScreen extends ConsumerStatefulWidget {
   const ReviewConfirmScreen({super.key});
 
   @override
-  State<ReviewConfirmScreen> createState() => _ReviewConfirmScreenState();
+  ConsumerState<ReviewConfirmScreen> createState() =>
+      _ReviewConfirmScreenState();
 }
 
-class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
+class _ReviewConfirmScreenState extends ConsumerState<ReviewConfirmScreen> {
   @override
   Widget build(BuildContext context) {
+    final appointmentState = ref.watch(appointmentNotifierProvider);
+    final symptomsAsync = ref.watch(symptomsProvider);
+
+    // Get draft data
+    final draftSymptomIds = appointmentState.draftSymptomIds ?? [];
+    final draftDescription = appointmentState.draftDescription ?? '';
+    final draftDuration = appointmentState.draftDuration ?? '';
+    final draftSeverity = appointmentState.draftSeverity ?? 0;
+    final draftFiles = appointmentState.draftUploadedFiles ?? [];
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -51,46 +66,58 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
                     ),
                     const SizedBox(height: 32),
                     // Symptoms Summary Card
-                    _buildSection(
-                      title: 'Symptoms Summary',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: ['Fever', 'Headache'].map((symptom) {
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
+                    symptomsAsync.when(
+                      loading: () => const CircularProgressIndicator(),
+                      error: (_, _) => const SizedBox(),
+                      data: (allSymptoms) {
+                        // Get symptom names from IDs
+                        final selectedSymptoms = allSymptoms
+                            .where((s) => draftSymptomIds.contains(s.id))
+                            .toList();
+
+                        return _buildSection(
+                          title: 'Symptoms Summary',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (selectedSymptoms.isNotEmpty)
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: selectedSymptoms.map((symptom) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.lightBlue,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        symptom.name,
+                                        style: const TextStyle(
+                                          color: AppColors.primaryColor,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
                                 ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.lightBlue,
-                                  borderRadius: BorderRadius.circular(20),
+                              const SizedBox(height: 12),
+                              Text(
+                                '$draftDescription\n\nDuration: $draftDuration\nSeverity: $draftSeverity/10',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  height: 1.5,
                                 ),
-                                child: Text(
-                                  symptom,
-                                  style: const TextStyle(
-                                    color: AppColors.primaryColor,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Patient experiencing fever and headache for 2 days. Severity: 6/10',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     // Attachments Card
@@ -105,7 +132,9 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '2 files uploaded',
+                            draftFiles.isEmpty
+                                ? 'No files uploaded'
+                                : '${draftFiles.length} file${draftFiles.length == 1 ? '' : 's'} uploaded',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[600],
@@ -172,10 +201,30 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: CustomButton(
-                text: 'Join Queue',
-                onPressed: () {
-                  context.go(AppRoutes.waitingQueue);
-                },
+                text: appointmentState.isLoading
+                    ? 'Joining Queue...'
+                    : 'Join Queue',
+                onPressed: appointmentState.isLoading
+                    ? null
+                    : () async {
+                        try {
+                          await ref
+                              .read(appointmentNotifierProvider.notifier)
+                              .submitAppointment();
+
+                          if (context.mounted) {
+                            successSnack('Appointment created successfully');
+                            context.go(AppRoutes.waitingQueue);
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            errorSnack(
+                              appointmentState.error ??
+                                  'Failed to create appointment. Please try again.',
+                            );
+                          }
+                        }
+                      },
               ),
             ),
           ],

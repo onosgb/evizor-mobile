@@ -67,5 +67,12 @@
 	<!-- Biometric Authentication (Face ID) -->
 	<key>NSFaceIDUsageDescription</key>
 	<string>We use Face ID to provide secure and convenient login to your account</string>
+	<!-- Camera and Photo Library Permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>We need camera access to take photos of medical documents and records</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need photo library access to select images of medical documents and records</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need permission to save photos to your photo library</string>
 </dict>
 </plist>

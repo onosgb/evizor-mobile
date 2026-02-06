@@ -1,40 +1,63 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-// import 'package:image_picker/image_picker.dart'; // Removed for design phase
-// import 'dart:io'; // Removed for design phase
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import '../../providers/consultation_provider.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/toastification.dart';
 import '../../widgets/custom_button.dart';
 
-class UploadFilesScreen extends StatefulWidget {
+class UploadFilesScreen extends ConsumerStatefulWidget {
   const UploadFilesScreen({super.key});
 
   @override
-  State<UploadFilesScreen> createState() => _UploadFilesScreenState();
+  ConsumerState<UploadFilesScreen> createState() => _UploadFilesScreenState();
 }
 
-class _UploadFilesScreenState extends State<UploadFilesScreen> {
-  // final ImagePicker _picker = ImagePicker(); // Removed for design phase
-  final List<String> _uploadedFiles =
-      []; // Using String for design phase instead of File
+class _UploadFilesScreenState extends ConsumerState<UploadFilesScreen> {
+  final ImagePicker _picker = ImagePicker();
+  final List<File> _uploadedFiles = [];
 
-  Future<void> _pickImage(String source) async {
-    // Image picker temporarily disabled for design phase
-    infoSnack('Image picker coming soon');
-    // Simulate file upload for design
-    setState(() {
-      _uploadedFiles.add('image_${_uploadedFiles.length + 1}.jpg');
-    });
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _uploadedFiles.add(File(image.path));
+        });
+        successSnack('Image added successfully');
+      }
+    } catch (e) {
+      errorSnack('Failed to pick image: ${e.toString()}');
+    }
   }
 
   Future<void> _pickDocument() async {
-    // Document picker temporarily disabled for design phase
-    infoSnack('Document picker coming soon');
-    // Simulate file upload for design
-    setState(() {
-      _uploadedFiles.add('document_${_uploadedFiles.length + 1}.pdf');
-    });
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        setState(() {
+          _uploadedFiles.add(File(result.files.single.path!));
+        });
+        successSnack('Document added successfully');
+      }
+    } catch (e) {
+      errorSnack('Failed to pick document: ${e.toString()}');
+    }
   }
 
   void _removeFile(int index) {
@@ -93,7 +116,7 @@ class _UploadFilesScreenState extends State<UploadFilesScreen> {
                             ), // Light blue
                             iconColor: AppColors.primaryColor,
                             textColor: AppColors.primaryColor,
-                            onTap: () => _pickImage('camera'),
+                            onTap: () => _pickImage(ImageSource.camera),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -106,7 +129,7 @@ class _UploadFilesScreenState extends State<UploadFilesScreen> {
                             ), // Light green
                             iconColor: AppColors.primaryGreen,
                             textColor: AppColors.primaryGreen,
-                            onTap: () => _pickImage('gallery'),
+                            onTap: () => _pickImage(ImageSource.gallery),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -147,6 +170,13 @@ class _UploadFilesScreenState extends State<UploadFilesScreen> {
                             ),
                         itemCount: _uploadedFiles.length,
                         itemBuilder: (context, index) {
+                          final file = _uploadedFiles[index];
+                          final fileName = file.path.split('/').last;
+                          final isPdf =
+                              fileName.toLowerCase().endsWith('.pdf') ||
+                              fileName.toLowerCase().endsWith('.doc') ||
+                              fileName.toLowerCase().endsWith('.docx');
+
                           return Stack(
                             children: [
                               Container(
@@ -154,29 +184,46 @@ class _UploadFilesScreenState extends State<UploadFilesScreen> {
                                   color: AppColors.backgroundGrey,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        _uploadedFiles[index].endsWith('.pdf')
-                                            ? Icons.description
-                                            : Icons.image,
-                                        size: 40,
-                                        color: Colors.grey[600],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        _uploadedFiles[index],
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey[600],
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: isPdf
+                                      ? Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.description,
+                                                size: 40,
+                                                color: Colors.grey[600],
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                    ),
+                                                child: Text(
+                                                  fileName,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : Image.file(
+                                          file,
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          height: double.infinity,
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
                                 ),
                               ),
                               Positioned(
@@ -215,12 +262,23 @@ class _UploadFilesScreenState extends State<UploadFilesScreen> {
                   CustomButton(
                     text: 'Continue',
                     onPressed: () {
+                      // Save uploaded file paths to draft state
+                      final filePaths = _uploadedFiles
+                          .map((f) => f.path)
+                          .toList();
+                      ref
+                          .read(appointmentNotifierProvider.notifier)
+                          .saveUploadedFiles(filePaths);
                       context.push(AppRoutes.reviewConfirm);
                     },
                   ),
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {
+                      // Save empty files list to draft state
+                      ref
+                          .read(appointmentNotifierProvider.notifier)
+                          .saveUploadedFiles([]);
                       context.push(AppRoutes.reviewConfirm);
                     },
                     child: const Text(

@@ -11,6 +11,8 @@ class BiometricService {
   static const String _keyBiometricEnabled = 'biometric_enabled';
   static const String _keyStoredEmail = 'biometric_email';
   static const String _keyStoredPassword = 'biometric_password';
+  static const String _keyBiometricPromptDismissed =
+      'biometric_prompt_dismissed';
 
   /// Check if device supports biometric authentication
   Future<bool> canUseBiometrics() async {
@@ -90,10 +92,28 @@ class BiometricService {
     await _secureStorage.delete(key: _keyBiometricEnabled);
     await _secureStorage.delete(key: _keyStoredEmail);
     await _secureStorage.delete(key: _keyStoredPassword);
+    // Clear the dismissed flag when biometric is disabled
+    await _secureStorage.delete(key: _keyBiometricPromptDismissed);
   }
 
   /// Clear all biometric data (called on logout)
   Future<void> clearBiometricData() async {
     await disableBiometric();
+  }
+
+  /// Check if user has dismissed the biometric prompt before
+  Future<bool> hasUserDismissedPrompt() async {
+    final String? dismissed = await _secureStorage.read(
+      key: _keyBiometricPromptDismissed,
+    );
+    return dismissed == 'true';
+  }
+
+  /// Mark that user has dismissed the biometric prompt
+  Future<void> markPromptAsDismissed() async {
+    await _secureStorage.write(
+      key: _keyBiometricPromptDismissed,
+      value: 'true',
+    );
   }
 }

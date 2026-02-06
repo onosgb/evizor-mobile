@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
-import 'biometric_service.dart';
 
 /// Service for managing local storage (tokens, onboarding status, etc.)
 class StorageService {

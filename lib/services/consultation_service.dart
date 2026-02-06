@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../models/symptom_model.dart';
+import '../models/api_response.dart';
 import 'api_client.dart';
 
 /// Consultation API service
@@ -47,68 +48,51 @@ class ConsultationService {
 
   /// Create a new appointment with symptoms
   ///
-  /// Endpoint: POST /api/v1/appointments
-  /// Request: {
-  ///   "symptoms": {
-  ///     "tags": ["symptomId-1", "symptomId-2"],
-  ///     "description": "string",
-  ///     "duration": "string",
-  ///     "severity": number
-  ///   }
-  /// }
+
+  /// Endpoint: POST /appointments
+  /// Request: { symptoms, description, duration, severity, attachments? }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> createAppointment({
     required List<String> symptomIds,
     required String description,
     required String duration,
     required int severity,
+    List<String>? attachments,
   }) async {
     try {
       final requestData = {
-        'symptoms': {
-          'tags': symptomIds,
-          'description': description,
-          'duration': duration,
-          'severity': severity,
-        },
+        'symtomps': symptomIds,
+        'description': description,
+        'duration': duration,
+        'severity': severity,
+        if (attachments != null && attachments.isNotEmpty)
+          'attachments': attachments,
       };
-
       final response = await _dio.post('/appointments', data: requestData);
 
-      // Handle both String and Map responses
-      if (response.data is Map<String, dynamic>) {
-        return response.data as Map<String, dynamic>;
-      } else if (response.data is String) {
-        return {'message': response.data as String};
-      } else {
-        return {'message': 'Appointment created successfully'};
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
       }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        String errorMessage;
-        if (errorData is Map<String, dynamic>) {
-          errorMessage =
-              errorData['message'] ??
-              errorData['error'] ??
-              'Failed to create appointment. Please try again.';
-        } else if (errorData is String) {
-          errorMessage = errorData;
-        } else {
-          errorMessage = 'Failed to create appointment. Please try again.';
-        }
-        throw Exception(errorMessage);
+        // Extract error message directly from response
+        final errorData = e.response!.data['message'].toString();
+
+        throw Exception(errorData);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
-      if (e is Exception) {
-        rethrow;
-      }
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
