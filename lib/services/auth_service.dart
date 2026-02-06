@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:evizor/models/user_model.dart';
 import '../models/registration_model.dart';
 import '../models/update_profile_request_model.dart';
+import '../models/api_response.dart';
+import '../models/login_response.dart';
 
 /// Authentication API service
 class AuthService {
@@ -12,31 +14,36 @@ class AuthService {
   /// Register a new patient account
   ///
   /// Endpoint: POST /auth/register
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> register(RegistrationRequest request) async {
     try {
-      // Log data before sending
       final requestData = request.toJson();
-
       final response = await _dio.post('/auth/register', data: requestData);
 
-      return response.data as Map<String, dynamic>;
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
-      if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        throw Exception(
-          errorData?['message'] ??
-              errorData?['error'] ??
-              'Registration failed. Please try again.',
+      if (e.response?.data != null) {
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
         );
+        throw Exception(apiResponse.message.toString());
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -45,100 +52,116 @@ class AuthService {
   ///
   /// Endpoint: POST /auth/login
   /// Request: { "email": "string", "password": "string" }
-  Future<Map<String, dynamic>> login({
+  /// Response: { "message": "string", "statusCode": number, "data": { "accessToken": "string", "refreshToken": "string", "user": {...} } }
+  Future<LoginResponse> login({
     required String email,
     required String password,
   }) async {
     try {
-      // Log data before sending
       final requestData = {'email': email, 'password': password};
-
       final response = await _dio.post('/auth/login', data: requestData);
 
-      return response.data as Map<String, dynamic>;
+      final apiResponse = ApiResponse<LoginResponse>.fromJson(
+        response.data,
+        (json) => LoginResponse.fromJson(json as Map<String, dynamic>),
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        throw Exception(
-          errorData?['message'] ??
-              errorData?['error'] ??
-              'Login failed. Please check your credentials.',
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
         );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
 
   /// Refresh access token using refresh token
   ///
-  /// Endpoint: POST /auth/refresh
+  /// Endpoint: POST /auth/refresh-token
   /// Request: { "refreshToken": "string" }
-  /// Response: { "data": { "accessToken": "string", "refreshToken": "string" } }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
     try {
       final requestData = {'refreshToken': refreshToken};
-
       final response = await _dio.post(
         '/auth/refresh-token',
         data: requestData,
       );
 
-      return response as Map<String, dynamic>;
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        throw Exception(
-          errorData?['message'] ??
-              errorData?['error'] ??
-              'Token refresh failed. Please login again.',
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
         );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
 
   /// Fetch full user profile
   ///
-  /// Endpoint: GET /auth/profile or GET /users/me
-  /// Response: { "data": { ...full user profile... } }
+  /// Endpoint: GET /users/my-profile
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<User> fetchUserProfile() async {
     try {
       final response = await _dio.get('/users/my-profile');
-      final data = response.data['data'];
-      return User.fromJson(data);
+
+      final apiResponse = ApiResponse<User>.fromJson(
+        response.data,
+        (json) => User.fromJson(json as Map<String, dynamic>),
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        throw Exception(
-          errorData?['message'] ??
-              errorData?['error'] ??
-              'Failed to fetch user profile.',
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
         );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -146,22 +169,39 @@ class AuthService {
   /// Update user profile
   ///
   /// Endpoint: PUT /users/update-profile
-  /// This method sends all existing user information (except id, email, profilePhotoUrl) to the server
   /// Request: UpdateProfileRequest model
-  /// Response: { "data": { ...updated user profile... } }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<User> updateProfile(UpdateProfileRequest request) async {
     try {
       final response = await _dio.put(
         '/users/update-profile',
         data: request.toJson(),
       );
-      return User.fromJson(response.data['data']);
-    } on DioException catch (e) {
-      throw Exception(e.response?.data['message']);
-    } catch (e) {
-      if (e is Exception) {
-        rethrow;
+
+      final apiResponse = ApiResponse<User>.fromJson(
+        response.data,
+        (json) => User.fromJson(json as Map<String, dynamic>),
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
       }
+
+      return apiResponse.data;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
+        );
+        throw Exception(apiResponse.message);
+      } else {
+        throw Exception(
+          e.message ?? 'Network error. Please check your connection.',
+        );
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -170,36 +210,41 @@ class AuthService {
   ///
   /// Endpoint: POST /auth/resend-email-verification
   /// Request: { "email": "string" }
-  /// Response: { "message": "string" }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> resendEmailVerification({
     required String email,
   }) async {
     try {
-      // Log data before sending
       final requestData = {'email': email};
       final response = await _dio.post(
         '/auth/resend-email-verification',
         data: requestData,
       );
 
-      return response.data as Map<String, dynamic>;
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        throw Exception(
-          errorData?['message'] ??
-              errorData?['error'] ??
-              'Failed to resend verification code. Please try again.',
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
         );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -207,35 +252,40 @@ class AuthService {
   /// Verify email with OTP code
   ///
   /// Endpoint: POST /auth/verify-email
-  /// Response: { "token": "string", "email": "string" }
+  /// Request: { "email": "string", "token": "string" }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> verifyEmail({
     required String email,
     required String otpCode,
   }) async {
     try {
-      // Log data before sending
       final requestData = {'email': email, 'token': otpCode};
-
       final response = await _dio.post('/auth/verify-email', data: requestData);
 
-      return response.data as Map<String, dynamic>;
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        throw Exception(
-          errorData?['message'] ??
-              errorData?['error'] ??
-              'Email verification failed. Please try again.',
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
         );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -244,35 +294,39 @@ class AuthService {
   ///
   /// Endpoint: POST /auth/forgot-password
   /// Request: { "email": "string" }
-  /// Response: { "message": "string" }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> forgotPassword({required String email}) async {
     try {
-      // Log data before sending
       final requestData = {'email': email};
-
       final response = await _dio.post(
         '/auth/forgot-password',
         data: requestData,
       );
 
-      return response.data as Map<String, dynamic>;
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        throw Exception(
-          errorData?['message'] ??
-              errorData?['error'] ??
-              'Failed to send password reset code. Please try again.',
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
         );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -281,37 +335,42 @@ class AuthService {
   ///
   /// Endpoint: POST /auth/verify-reset-password
   /// Request: { "email": "string", "token": "string" }
-  /// Response: { "message": "string" }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> verifyResetPasswordOTP({
     required String email,
     required String otpCode,
   }) async {
     try {
-      // Log data before sending
       final requestData = {'email': email, 'token': otpCode};
       final response = await _dio.post(
         '/auth/verify-reset-password',
         data: requestData,
       );
 
-      return response.data as Map<String, dynamic>;
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        throw Exception(
-          errorData?['message'] ??
-              errorData?['error'] ??
-              'Invalid verification code. Please try again.',
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
         );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -320,54 +379,41 @@ class AuthService {
   ///
   /// Endpoint: POST /auth/resend-password-reset
   /// Request: { "email": "string" }
-  /// Response: { "message": "string" }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> resendPasswordReset({
     required String email,
   }) async {
     try {
-      // Log data before sending
       final requestData = {'email': email};
       final response = await _dio.post(
         '/auth/resend-password-reset',
         data: requestData,
       );
 
-      // Handle both String and Map responses
-      if (response.data is Map<String, dynamic>) {
-        return response.data as Map<String, dynamic>;
-      } else if (response.data is String) {
-        return {'message': response.data as String};
-      } else {
-        return {'message': 'Password reset code sent successfully'};
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
       }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        String errorMessage;
-        if (errorData is Map<String, dynamic>) {
-          errorMessage =
-              errorData['message'] ??
-              errorData['error'] ??
-              'Failed to resend password reset code. Please try again.';
-        } else if (errorData is String) {
-          errorMessage = errorData;
-        } else {
-          errorMessage =
-              'Failed to resend password reset code. Please try again.';
-        }
-        throw Exception(errorMessage);
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
+        );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
-      if (e is Exception) {
-        rethrow;
-      }
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -376,53 +422,39 @@ class AuthService {
   ///
   /// Endpoint: PUT /users/update-profile
   /// Request: { "isTwoFAEnabled": bool }
-  /// Response: { "data": { ...updated user profile... } }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> toggle2FA({required bool enable}) async {
     try {
       final requestData = {'isTwoFAEnabled': enable};
-
       final response = await _dio.put(
         '/users/update-profile',
         data: requestData,
       );
 
-      // Handle both String and Map responses
-      if (response.data is Map<String, dynamic>) {
-        return response.data as Map<String, dynamic>;
-      } else if (response.data is String) {
-        return {'message': response.data as String};
-      } else {
-        return {
-          'message': '2FA ${enable ? 'enabled' : 'disabled'} successfully',
-        };
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
       }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        String errorMessage;
-        if (errorData is Map<String, dynamic>) {
-          errorMessage =
-              errorData['message'] ??
-              errorData['error'] ??
-              'Failed to toggle 2FA. Please try again.';
-        } else if (errorData is String) {
-          errorMessage = errorData;
-        } else {
-          errorMessage = 'Failed to toggle 2FA. Please try again.';
-        }
-        throw Exception(errorMessage);
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
+        );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
-      if (e is Exception) {
-        rethrow;
-      }
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
@@ -431,55 +463,42 @@ class AuthService {
   ///
   /// Endpoint: POST /auth/reset-password
   /// Request: { "token": "string", "newPassword": "string" }
-  /// Response: { "message": "string" }
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
   Future<Map<String, dynamic>> resetPassword({
     required String token,
     required String newPassword,
   }) async {
     try {
-      // Log data before sending
       final requestData = {'token': token, 'newPassword': newPassword};
-
       final response = await _dio.post(
         '/auth/reset-password',
         data: requestData,
       );
 
-      // Handle both String and Map responses
-      if (response.data is Map<String, dynamic>) {
-        return response.data as Map<String, dynamic>;
-      } else if (response.data is String) {
-        return {'message': response.data as String};
-      } else {
-        return {'message': 'Password reset successfully'};
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
       }
+
+      return apiResponse.data;
     } on DioException catch (e) {
-      // Handle Dio errors
       if (e.response != null) {
-        // Server responded with error status
-        final errorData = e.response?.data;
-        String errorMessage;
-        if (errorData is Map<String, dynamic>) {
-          errorMessage =
-              errorData['message'] ??
-              errorData['error'] ??
-              'Password reset failed. Please try again.';
-        } else if (errorData is String) {
-          errorMessage = errorData;
-        } else {
-          errorMessage = 'Password reset failed. Please try again.';
-        }
-        throw Exception(errorMessage);
+        final apiResponse = ApiResponse<dynamic>.fromJson(
+          e.response!.data,
+          (json) => json,
+        );
+        throw Exception(apiResponse.message);
       } else {
-        // Network or other error
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
         );
       }
     } catch (e) {
-      if (e is Exception) {
-        rethrow;
-      }
+      if (e is Exception) rethrow;
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
