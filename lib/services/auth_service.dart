@@ -3,6 +3,7 @@ import 'package:evizor/models/user_model.dart';
 import '../models/registration_model.dart';
 import '../models/update_profile_request_model.dart';
 import '../models/api_response.dart';
+import '../models/api_error_response.dart';
 import '../models/login_response.dart';
 
 /// Authentication API service
@@ -32,11 +33,8 @@ class AuthService {
       return apiResponse.data;
     } on DioException catch (e) {
       if (e.response?.data != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message.toString());
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -72,12 +70,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -113,12 +108,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -149,12 +141,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -189,12 +178,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -232,12 +218,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -273,12 +256,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -314,12 +294,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -358,12 +335,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -401,12 +375,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -442,12 +413,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',
@@ -486,12 +454,9 @@ class AuthService {
 
       return apiResponse.data;
     } on DioException catch (e) {
-      if (e.response != null) {
-        final apiResponse = ApiResponse<dynamic>.fromJson(
-          e.response!.data,
-          (json) => json,
-        );
-        throw Exception(apiResponse.message);
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',

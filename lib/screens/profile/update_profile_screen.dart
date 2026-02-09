@@ -4,12 +4,15 @@ import 'package:go_router/go_router.dart';
 import '../../models/update_profile_request_model.dart';
 import '../../providers/user_provider.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/app_routes.dart';
 import '../../utils/toastification.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 
 class UpdateProfileScreen extends ConsumerStatefulWidget {
-  const UpdateProfileScreen({super.key});
+  final bool forceUpdate;
+
+  const UpdateProfileScreen({super.key, this.forceUpdate = false});
 
   @override
   ConsumerState<UpdateProfileScreen> createState() =>
@@ -150,7 +153,11 @@ class _UpdateProfileScreenState extends ConsumerState<UpdateProfileScreen> {
 
         if (mounted) {
           successSnack('Profile updated successfully');
-          context.pop();
+          if (widget.forceUpdate) {
+            context.go(AppRoutes.home);
+          } else {
+            context.pop();
+          }
         }
       } catch (e) {
         setState(() => _isLoading = false);
@@ -169,249 +176,264 @@ class _UpdateProfileScreenState extends ConsumerState<UpdateProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text(
-          'Update Profile',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: !widget.forceUpdate,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (widget.forceUpdate) {
+          infoSnack('Please complete your profile to continue');
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          automaticallyImplyLeading: !widget.forceUpdate,
+          leading: widget.forceUpdate
+              ? null
+              : IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: AppColors.textPrimary,
+                  ),
+                  onPressed: () => context.pop(),
+                ),
+          title: const Text(
+            'Update Profile',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 8),
-                // First Name
-                CustomTextField(
-                  label: 'First Name',
-                  hint: 'Enter your first name',
-                  controller: _firstNameController,
-                  prefixIcon: const Icon(Icons.person_outline),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your first name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                // Last Name
-                CustomTextField(
-                  label: 'Last Name',
-                  hint: 'Enter your last name',
-                  controller: _lastNameController,
-                  prefixIcon: const Icon(Icons.person_outline),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your last name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                // Phone Number
-                CustomTextField(
-                  label: 'Phone Number',
-                  hint: 'Enter your phone number',
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  prefixIcon: const Icon(Icons.phone_outlined),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your phone number';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                // Date of Birth
-                GestureDetector(
-                  onTap: () => _selectDate(context),
-                  behavior: HitTestBehavior.opaque,
-                  child: AbsorbPointer(
-                    child: CustomTextField(
-                      label: 'Date of Birth',
-                      hint: 'Select your date of birth',
-                      controller: _dateOfBirthController,
-                      prefixIcon: const Icon(Icons.calendar_today_outlined),
-                      readOnly: true,
-                      enabled: true,
-                      validator: (value) {
-                        if (_selectedDate == null) {
-                          return 'Please select your date of birth';
-                        }
-                        return null;
-                      },
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 8),
+                  // First Name
+                  CustomTextField(
+                    label: 'First Name',
+                    hint: 'Enter your first name',
+                    controller: _firstNameController,
+                    prefixIcon: const Icon(Icons.person_outline),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your first name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  // Last Name
+                  CustomTextField(
+                    label: 'Last Name',
+                    hint: 'Enter your last name',
+                    controller: _lastNameController,
+                    prefixIcon: const Icon(Icons.person_outline),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your last name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  // Phone Number
+                  CustomTextField(
+                    label: 'Phone Number',
+                    hint: 'Enter your phone number',
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your phone number';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  // Date of Birth
+                  GestureDetector(
+                    onTap: () => _selectDate(context),
+                    behavior: HitTestBehavior.opaque,
+                    child: AbsorbPointer(
+                      child: CustomTextField(
+                        label: 'Date of Birth',
+                        hint: 'Select your date of birth',
+                        controller: _dateOfBirthController,
+                        prefixIcon: const Icon(Icons.calendar_today_outlined),
+                        readOnly: true,
+                        enabled: true,
+                        validator: (value) {
+                          if (_selectedDate == null) {
+                            return 'Please select your date of birth';
+                          }
+                          return null;
+                        },
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                // Gender Dropdown
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Gender',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedGender,
-                      decoration: InputDecoration(
-                        hintText: 'Select gender',
-                        prefixIcon: const Icon(Icons.person_outline),
-                        filled: true,
-                        fillColor: AppColors.backgroundGrey,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppColors.primaryColor,
-                            width: 2,
-                          ),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppColors.error,
-                            width: 1,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
+                  const SizedBox(height: 20),
+                  // Gender Dropdown
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Gender',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      items: _genders.map((String gender) {
-                        return DropdownMenuItem<String>(
-                          value: gender,
-                          child: Text(gender),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _selectedGender = newValue;
-                        });
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please select your gender';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Blood Group Dropdown
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Blood Group',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedBloodGroup,
-                      decoration: InputDecoration(
-                        hintText: 'Select blood group',
-                        prefixIcon: const Icon(Icons.bloodtype_outlined),
-                        filled: true,
-                        fillColor: AppColors.backgroundGrey,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppColors.primaryColor,
-                            width: 2,
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedGender,
+                        decoration: InputDecoration(
+                          hintText: 'Select gender',
+                          prefixIcon: const Icon(Icons.person_outline),
+                          filled: true,
+                          fillColor: AppColors.backgroundGrey,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.primaryColor,
+                              width: 2,
+                            ),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.error,
+                              width: 1,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
                           ),
                         ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppColors.error,
-                            width: 1,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
+                        items: _genders.map((String gender) {
+                          return DropdownMenuItem<String>(
+                            value: gender,
+                            child: Text(gender),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedGender = newValue;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select your gender';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Blood Group Dropdown
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Blood Group',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      items: _bloodGroups.map((String bloodGroup) {
-                        return DropdownMenuItem<String>(
-                          value: bloodGroup,
-                          child: Text(bloodGroup),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _selectedBloodGroup = newValue;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Address
-                CustomTextField(
-                  label: 'Address',
-                  hint: 'Enter your address',
-                  controller: _addressController,
-                  maxLines: 2,
-                  prefixIcon: const Icon(Icons.location_on_outlined),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter your address';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 40),
-                // Update Button
-                CustomButton(
-                  text: 'Update Profile',
-                  onPressed: _handleUpdate,
-                  isLoading: _isLoading,
-                ),
-              ],
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedBloodGroup,
+                        decoration: InputDecoration(
+                          hintText: 'Select blood group',
+                          prefixIcon: const Icon(Icons.bloodtype_outlined),
+                          filled: true,
+                          fillColor: AppColors.backgroundGrey,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.primaryColor,
+                              width: 2,
+                            ),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.error,
+                              width: 1,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                        ),
+                        items: _bloodGroups.map((String bloodGroup) {
+                          return DropdownMenuItem<String>(
+                            value: bloodGroup,
+                            child: Text(bloodGroup),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedBloodGroup = newValue;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Address
+                  CustomTextField(
+                    label: 'Address',
+                    hint: 'Enter your address',
+                    controller: _addressController,
+                    maxLines: 2,
+                    prefixIcon: const Icon(Icons.location_on_outlined),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your address';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 40),
+                  // Update Button
+                  CustomButton(
+                    text: 'Update Profile',
+                    onPressed: _handleUpdate,
+                    isLoading: _isLoading,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -154,7 +154,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/profile/update',
       name: 'update-profile',
-      builder: (context, state) => const UpdateProfileScreen(),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final forceUpdate = extra?['forceUpdate'] as bool? ?? false;
+        return UpdateProfileScreen(forceUpdate: forceUpdate);
+      },
     ),
     GoRoute(
       path: '/notifications',

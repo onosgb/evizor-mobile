@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/consultation_service.dart';
+import '../models/appointment_model.dart';
 
 /// Provider for ConsultationService instance
 final consultationServiceForAppointmentProvider = Provider<ConsultationService>(
@@ -95,12 +96,16 @@ class AppointmentNotifier extends StateNotifier<AppointmentState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final appointment = await _consultationService.createAppointment(
-        symptomIds: state.draftSymptomIds!,
+      final appointmentData = Appointment(
+        symptoms: state.draftSymptomIds!,
         description: state.draftDescription!,
         duration: state.draftDuration!,
         severity: state.draftSeverity!,
         attachments: state.draftUploadedFiles,
+      );
+
+      final appointment = await _consultationService.createAppointment(
+        appointmentData,
       );
 
       state = state.copyWith(
@@ -127,11 +132,15 @@ class AppointmentNotifier extends StateNotifier<AppointmentState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final appointment = await _consultationService.createAppointment(
-        symptomIds: symptomIds,
+      final appointmentData = Appointment(
+        symptoms: symptomIds,
         description: description,
         duration: duration,
         severity: severity,
+      );
+
+      final appointment = await _consultationService.createAppointment(
+        appointmentData,
       );
 
       state = state.copyWith(

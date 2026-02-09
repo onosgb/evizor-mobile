@@ -25,7 +25,7 @@ class ApiResponse<T> {
     return ApiResponse<T>(
       message: _extractMessage(json['message']),
       statusCode: json['statusCode'] as int? ?? 200,
-      data: fromJsonT(json['data']),
+      data: fromJsonT(json['data'] ?? {}),
     );
   }
 

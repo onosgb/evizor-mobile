@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:evizor/models/api_error_response.dart';
 import '../models/symptom_model.dart';
+import '../models/appointment_model.dart';
 import '../models/api_response.dart';
 import 'api_client.dart';
 
@@ -15,7 +17,7 @@ class ConsultationService {
   /// Endpoint: GET /symptoms
   Future<List<Symptom>> fetchSymptoms() async {
     try {
-      final response = await _dio.get('/symtomps/tenant');
+      final response = await _dio.get('/symptoms/tenant');
       // If response is a list
       final data = response.data['data'] as List;
       return data.map<Symptom>((item) {
@@ -29,12 +31,8 @@ class ConsultationService {
       // Handle Dio errors
       if (e.response != null) {
         // Server responded with error status
-        final errorData = e.response?.data;
-        throw Exception(
-          errorData?['message'] ??
-              errorData?['error'] ??
-              'Failed to fetch symptoms. Please try again.',
-        );
+        final errorData = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorData.message);
       } else {
         // Network or other error
         throw Exception(
@@ -52,23 +50,30 @@ class ConsultationService {
   /// Endpoint: POST /appointments
   /// Request: { symptoms, description, duration, severity, attachments? }
   /// Response: { "message": "string", "statusCode": number, "data": {...} }
-  Future<Map<String, dynamic>> createAppointment({
-    required List<String> symptomIds,
-    required String description,
-    required String duration,
-    required int severity,
-    List<String>? attachments,
-  }) async {
+  Future<Map<String, dynamic>> createAppointment(
+    Appointment appointment,
+  ) async {
     try {
-      final requestData = {
-        'symtomps': symptomIds,
-        'description': description,
-        'duration': duration,
-        'severity': severity,
-        if (attachments != null && attachments.isNotEmpty)
-          'attachments': attachments,
+      final Map<String, dynamic> mapWithFiles = {
+        'symptoms ': appointment.symptoms,
+        'description': appointment.description,
+        'duration': appointment.duration,
+        'severity': appointment.severity,
       };
-      final response = await _dio.post('/appointments', data: requestData);
+
+      if (appointment.attachments != null &&
+          appointment.attachments!.isNotEmpty) {
+        final files = <MultipartFile>[];
+        for (var path in appointment.attachments!) {
+          files.add(await MultipartFile.fromFile(path));
+        }
+        mapWithFiles['attachments'] = files;
+      }
+
+      final formData = FormData.fromMap(mapWithFiles);
+      print('Form Data: $formData');
+
+      final response = await _dio.post('/appointments', data: formData);
 
       final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
         response.data,
@@ -83,9 +88,8 @@ class ConsultationService {
     } on DioException catch (e) {
       if (e.response != null) {
         // Extract error message directly from response
-        final errorData = e.response!.data['message'].toString();
-
-        throw Exception(errorData);
+        final errorData = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorData.message);
       } else {
         throw Exception(
           e.message ?? 'Network error. Please check your connection.',

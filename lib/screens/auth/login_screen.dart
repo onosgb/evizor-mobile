@@ -38,45 +38,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+  Future<void> _performLogin({
+    required String email,
+    required String password,
+    bool checkBiometric = false,
+  }) async {
+    setState(() => _isLoading = true);
 
-      try {
-        // Call login API
-        final response = await _authService.login(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+    try {
+      // Call login API
+      final response = await _authService.login(
+        email: email,
+        password: password,
+      );
 
-        setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
 
+      if (mounted) {
+        // Extract data from LoginResponse model
+        final token = response.accessToken;
+        final refreshToken = response.refreshToken;
+        final user = response.user;
+
+        // Validate that only patients can login on mobile app
+        if (user.role.toUpperCase() != 'PATIENT') {
+          throw Exception(
+            'Access denied. This mobile app is only available for patients. '
+            'Please use the appropriate platform for your account type.',
+          );
+        }
+
+        // Update user provider with the user from login response
         if (mounted) {
-          // Extract data from LoginResponse model
-          final token = response.accessToken;
-          final refreshToken = response.refreshToken;
-          final user = response.user;
+          await ref.read(currentUserProvider.notifier).setUser(user);
+        }
 
-          // Validate that only patients can login on mobile app
-          if (user.role.toUpperCase() != 'PATIENT') {
-            throw Exception(
-              'Access denied. This mobile app is only available for patients. '
-              'Please use the appropriate platform for your account type.',
-            );
-          }
+        // Save tokens to storage
+        await _storageService.saveTokens(token, refreshToken);
 
-          // Update user provider with the user from login response
-          if (mounted) {
-            await ref.read(currentUserProvider.notifier).setUser(user);
-          }
+        // Set auth token in API client for future requests
+        ApiClient().setAuthToken(token);
 
-          // Save tokens to storage
-          await _storageService.saveTokens(token, refreshToken);
-
-          // Set auth token in API client for future requests
-          ApiClient().setAuthToken(token);
-
-          // Prompt to enable biometric login if not already enabled or dismissed
+        // Prompt to enable biometric login if not already enabled or dismissed
+        // Only valid for standard login flow
+        if (checkBiometric) {
           final biometricEnabled = await _biometricService.isBiometricEnabled();
           final canUseBiometric = await _biometricService.canUseBiometrics();
           final hasUserDismissed = await _biometricService
@@ -88,19 +93,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               !hasUserDismissed) {
             await _promptEnableBiometric();
           }
-
-          // Navigate to home on success (only for patients)
-          if (mounted) {
-            context.go(AppRoutes.home);
-          }
         }
-      } catch (e) {
-        setState(() => _isLoading = false);
 
+        print(
+          'Login Response: ${response.profileCompleted} ${response.profileVerified}',
+        );
+
+        // Check if profile is verified
+        // if (!response.profileVerified) {
+        //   // Auto resend OTP
+        //   await _authService.resendEmailVerification(email: email);
+
+        //   if (mounted) {
+        //     infoSnack(
+        //       'Account not verified. A new verification code has been sent to your email.',
+        //     );
+        //     context.push(
+        //       AppRoutes.otpVerification,
+        //       extra: {
+        //         'flowType': 'emailVerification',
+        //         'registrationData': {'email': email},
+        //       },
+        //     );
+        //   }
+        //   return;
+        // }
+
+        // Check if profile is completed
+        // if (!response.profileCompleted) {
+        //   if (mounted) {
+        //     context.go(AppRoutes.updateProfile, extra: {'forceUpdate': true});
+        //   }
+        //   return;
+        // }
+
+        // Navigate to home on success (only for patients)
         if (mounted) {
-          errorSnack(e.toString().replaceFirst('Exception: ', ''));
+          context.go(AppRoutes.home);
         }
       }
+    } catch (e) {
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        errorSnack(e.toString().replaceFirst('Exception: ', ''));
+      }
+    }
+  }
+
+  Future<void> _handleLogin() async {
+    if (_formKey.currentState!.validate()) {
+      await _performLogin(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        checkBiometric: true,
+      );
     }
   }
 
@@ -131,45 +178,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
 
-      setState(() => _isLoading = true);
-
-      // Login with stored credentials
-      final response = await _authService.login(
+      // Perform login with stored credentials
+      await _performLogin(
         email: credentials['email']!,
         password: credentials['password']!,
+        checkBiometric: false,
       );
-
-      setState(() => _isLoading = false);
-
-      if (mounted) {
-        // Extract data from LoginResponse model
-        final token = response.accessToken;
-        final refreshToken = response.refreshToken;
-        final user = response.user;
-
-        // Validate patient role
-        if (user.role.toUpperCase() != 'PATIENT') {
-          throw Exception(
-            'Access denied. This mobile app is only available for patients.',
-          );
-        }
-
-        // Update user provider with the user from login response
-        if (mounted) {
-          await ref.read(currentUserProvider.notifier).setUser(user);
-        }
-
-        // Save tokens
-        await _storageService.saveTokens(token, refreshToken);
-        ApiClient().setAuthToken(token);
-
-        // Navigate to home
-        if (mounted) {
-          context.go(AppRoutes.home);
-        }
-      }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         errorSnack(e.toString().replaceFirst('Exception: ', ''));
       }

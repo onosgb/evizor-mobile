@@ -1,14 +1,14 @@
 /// Appointment model for creating new appointments
 class Appointment {
-  final List<String> symtomps; // List of symptom IDs
+  final List<String> symptoms; // List of symptom IDs
   final String description; // Detailed symptom description
-  final String duration; // How long symtomps have been present
+  final String duration; // How long symptoms have been present
   final int severity; // Severity level (1-10)
   final String? status;
   final List<String>? attachments; // Optional file attachments
 
   Appointment({
-    required this.symtomps,
+    required this.symptoms,
     required this.description,
     required this.duration,
     required this.severity,
@@ -19,8 +19,8 @@ class Appointment {
   /// Create Appointment from JSON
   factory Appointment.fromJson(Map<String, dynamic> json) {
     return Appointment(
-      symtomps: json['symtomps'] is List
-          ? (json['symtomps'] as List).map((e) => e.toString()).toList()
+      symptoms: json['symptoms'] is List
+          ? (json['symptoms'] as List).map((e) => e.toString()).toList()
           : [],
       description: json['description'] as String? ?? '',
       duration: json['duration'] as String? ?? '',
@@ -35,7 +35,7 @@ class Appointment {
   /// Convert Appointment to JSON for API request
   Map<String, dynamic> toJson() {
     return {
-      'symtomps': symtomps,
+      'symptoms': symptoms,
       'description': description,
       'duration': duration,
       'severity': severity,

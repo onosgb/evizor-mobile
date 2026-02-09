@@ -8,10 +8,15 @@ class LoginResponse {
   final String refreshToken;
   final User user;
 
+  final bool profileCompleted;
+  final bool profileVerified;
+
   LoginResponse({
     required this.accessToken,
     required this.refreshToken,
     required this.user,
+    required this.profileCompleted,
+    required this.profileVerified,
   });
 
   /// Create LoginResponse from JSON
@@ -20,6 +25,8 @@ class LoginResponse {
       accessToken: json['accessToken'] as String,
       refreshToken: json['refreshToken'] as String,
       user: User.fromJson(json['user'] as Map<String, dynamic>),
+      profileCompleted: json['profileCompleted'] as bool? ?? false,
+      profileVerified: json['profileVerified'] as bool? ?? false,
     );
   }
 
@@ -29,6 +36,8 @@ class LoginResponse {
       'accessToken': accessToken,
       'refreshToken': refreshToken,
       'user': user.toJson(),
+      'profileCompleted': profileCompleted,
+      'profileVerified': profileVerified,
     };
   }
 }

@@ -303,48 +303,50 @@ class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
   Widget _buildSymptomCarousel(List<dynamic> symptoms) {
     return Column(
       children: [
-        // Horizontal scrollable symptoms with peek effect
+        // Horizontal scrollable symptoms with 3 rows
         SizedBox(
-          height: 60,
-          child: ListView.builder(
+          height: 130, // Compact height for 3 rows
+          child: GridView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisExtent: 140, // Width of each item
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 4,
+              childAspectRatio: 0.3,
+            ),
             itemCount: symptoms.length,
-            itemExtent: 140, // Fixed width for each symptom
             itemBuilder: (context, index) {
               final symptom = symptoms[index];
               final isSelected = _selectedSymptomIds.contains(symptom.id);
 
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilterChip(
-                  label: SizedBox(
-                    width: double.infinity,
-                    child: Text(
-                      symptom.name,
-                      style: const TextStyle(fontSize: 13),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedSymptomIds.add(symptom.id);
-                      } else {
-                        _selectedSymptomIds.remove(symptom.id);
-                      }
-                    });
-                  },
-                  selectedColor: AppColors.primaryColor.withValues(alpha: 0.2),
-                  checkmarkColor: AppColors.primaryColor,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+              return FilterChip(
+                label: SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    symptom.name,
+                    style: const TextStyle(fontSize: 12),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedSymptomIds.add(symptom.id);
+                    } else {
+                      _selectedSymptomIds.remove(symptom.id);
+                    }
+                  });
+                },
+                selectedColor: AppColors.primaryColor.withValues(alpha: 0.2),
+                checkmarkColor: AppColors.primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                // Ensure chip fills the grid cell
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               );
             },
           ),
