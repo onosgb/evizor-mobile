@@ -95,37 +95,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           }
         }
 
-        print(
-          'Login Response: ${response.profileCompleted} ${response.profileVerified}',
-        );
-
         // Check if profile is verified
-        // if (!response.profileVerified) {
-        //   // Auto resend OTP
-        //   await _authService.resendEmailVerification(email: email);
+        if (!response.profileVerified) {
+          // Auto resend OTP
+          await _authService.resendEmailVerification(email: email);
 
-        //   if (mounted) {
-        //     infoSnack(
-        //       'Account not verified. A new verification code has been sent to your email.',
-        //     );
-        //     context.push(
-        //       AppRoutes.otpVerification,
-        //       extra: {
-        //         'flowType': 'emailVerification',
-        //         'registrationData': {'email': email},
-        //       },
-        //     );
-        //   }
-        //   return;
-        // }
+          if (mounted) {
+            infoSnack(
+              'Account not verified. A new verification code has been sent to your email.',
+            );
+            context.push(
+              AppRoutes.otpVerification,
+              extra: {
+                'flowType': 'emailVerification',
+                'registrationData': {'email': email},
+              },
+            );
+          }
+          return;
+        }
 
         // Check if profile is completed
-        // if (!response.profileCompleted) {
-        //   if (mounted) {
-        //     context.go(AppRoutes.updateProfile, extra: {'forceUpdate': true});
-        //   }
-        //   return;
-        // }
+        if (!response.profileCompleted) {
+          if (mounted) {
+            context.go(AppRoutes.updateProfile, extra: {'forceUpdate': true});
+          }
+          return;
+        }
 
         // Navigate to home on success (only for patients)
         if (mounted) {

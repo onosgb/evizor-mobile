@@ -71,7 +71,6 @@ class ConsultationService {
       }
 
       final formData = FormData.fromMap(mapWithFiles);
-      print('Form Data: $formData');
 
       final response = await _dio.post('/appointments', data: formData);
 

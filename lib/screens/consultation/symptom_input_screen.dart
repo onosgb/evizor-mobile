@@ -138,7 +138,7 @@ class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
                       // Description
                       CustomTextField(
                         label: 'Description',
-                        hint: 'Describe your symptoms in detail',
+                        hint: '(Optional) Describe your symptoms in detail',
                         controller: _descriptionController,
                         maxLines: 5,
                       ),
@@ -250,14 +250,7 @@ class _SymptomInputScreenState extends ConsumerState<SymptomInputScreen> {
                                       return;
                                     }
 
-                                    if (_descriptionController.text
-                                        .trim()
-                                        .isEmpty) {
-                                      errorSnack(
-                                        'Please provide a description',
-                                      );
-                                      return;
-                                    }
+                                    // Description is optional now
 
                                     if (_duration.isEmpty) {
                                       errorSnack(
