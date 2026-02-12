@@ -55,6 +55,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() => _isLoading = false);
 
       if (mounted) {
+        // Check if profile is verified
+        if (!response.profileVerified) {
+          if (mounted) {
+            infoSnack(
+              'Account not verified. A new verification code has been sent to your email.',
+            );
+            context.push(
+              AppRoutes.otpVerification,
+              extra: {
+                'flowType': 'emailVerification',
+                'registrationData': {'email': email},
+              },
+            );
+          }
+          return;
+        }
+
         // Extract data from LoginResponse model
         final token = response.accessToken;
         final refreshToken = response.refreshToken;
@@ -93,26 +110,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               !hasUserDismissed) {
             await _promptEnableBiometric();
           }
-        }
-
-        // Check if profile is verified
-        if (!response.profileVerified) {
-          // Auto resend OTP
-          await _authService.resendEmailVerification(email: email);
-
-          if (mounted) {
-            infoSnack(
-              'Account not verified. A new verification code has been sent to your email.',
-            );
-            context.push(
-              AppRoutes.otpVerification,
-              extra: {
-                'flowType': 'emailVerification',
-                'registrationData': {'email': email},
-              },
-            );
-          }
-          return;
         }
 
         // Check if profile is completed

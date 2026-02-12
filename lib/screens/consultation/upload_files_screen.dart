@@ -34,7 +34,6 @@ class _UploadFilesScreenState extends ConsumerState<UploadFilesScreen> {
         setState(() {
           _uploadedFiles.add(File(image.path));
         });
-        successSnack('Image added successfully');
       }
     } catch (e) {
       errorSnack('Failed to pick image: ${e.toString()}');
@@ -53,7 +52,6 @@ class _UploadFilesScreenState extends ConsumerState<UploadFilesScreen> {
         setState(() {
           _uploadedFiles.add(File(result.files.single.path!));
         });
-        successSnack('Document added successfully');
       }
     } catch (e) {
       errorSnack('Failed to pick document: ${e.toString()}');

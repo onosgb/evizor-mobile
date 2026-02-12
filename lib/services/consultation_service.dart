@@ -55,7 +55,7 @@ class ConsultationService {
   ) async {
     try {
       final Map<String, dynamic> mapWithFiles = {
-        'symptoms ': appointment.symptoms,
+        'symptoms': appointment.symptoms,
         'description': appointment.description,
         'duration': appointment.duration,
         'severity': appointment.severity,
@@ -67,7 +67,7 @@ class ConsultationService {
         for (var path in appointment.attachments!) {
           files.add(await MultipartFile.fromFile(path));
         }
-        mapWithFiles['attachments'] = files;
+        mapWithFiles['files'] = files;
       }
 
       final formData = FormData.fromMap(mapWithFiles);

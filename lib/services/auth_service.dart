@@ -58,7 +58,6 @@ class AuthService {
     try {
       final requestData = {'email': email, 'password': password};
       final response = await _dio.post('/auth/login', data: requestData);
-
       final apiResponse = ApiResponse<LoginResponse>.fromJson(
         response.data,
         (json) => LoginResponse.fromJson(json as Map<String, dynamic>),
