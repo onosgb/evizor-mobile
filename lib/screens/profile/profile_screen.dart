@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/user_provider.dart';
 import '../../services/api_client.dart';
+import '../../services/auth_service.dart';
 import '../../services/storage_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
@@ -15,6 +16,8 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _isLoggingOut = false;
+
   @override
   void initState() {
     super.initState();
@@ -371,59 +374,101 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () async {
-          // Show confirmation dialog
-          final shouldLogout = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Logout'),
-              content: const Text('Are you sure you want to logout?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
+        onPressed: _isLoggingOut
+            ? null
+            : () async {
+                // Show confirmation dialog
+                final shouldLogout = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Logout'),
+                    content: const Text('Are you sure you want to logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: const Text('Logout'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (shouldLogout == true && context.mounted) {
+                  // Set loading state
+                  setState(() {
+                    _isLoggingOut = true;
+                  });
+
+                  try {
+                    // Call logout endpoint
+                    final apiClient = ApiClient();
+                    final authService = AuthService(apiClient.dio);
+
+                    try {
+                      await authService.logout();
+                    } catch (e) {
+                      // Continue with local logout even if API call fails
+                      debugPrint('Logout API call failed: $e');
+                    }
+
+                    // Clear all user data and tokens
+                    final storageService = StorageService();
+                    await storageService
+                        .logout(); // Clears tokens and user data
+
+                    // Clear user provider state
+                    ref.read(currentUserProvider.notifier).clear();
+
+                    // Remove auth token from API client
+                    apiClient.removeAuthToken();
+
+                    // Navigate to login
+                    if (context.mounted) {
+                      context.go(AppRoutes.login);
+                    }
+                  } finally {
+                    // Reset loading state (in case navigation fails)
+                    if (mounted) {
+                      setState(() {
+                        _isLoggingOut = false;
+                      });
+                    }
+                  }
+                }
+              },
+        icon: _isLoggingOut
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  style: TextButton.styleFrom(foregroundColor: Colors.red),
-                  child: const Text('Logout'),
-                ),
-              ],
-            ),
-          );
-
-          if (shouldLogout == true && context.mounted) {
-            // Clear all user data and tokens
-            final storageService = StorageService();
-            await storageService.logout(); // Clears tokens and user data
-
-            // Clear user provider state
-            ref.read(currentUserProvider.notifier).clear();
-
-            // Remove auth token from API client
-            ApiClient().removeAuthToken();
-
-            // Navigate to login
-            if (context.mounted) {
-              context.go(AppRoutes.login);
-            }
-          }
-        },
-        icon: const Icon(Icons.logout, color: Colors.white),
-        label: const Text(
-          'Logout',
-          style: TextStyle(
+              )
+            : const Icon(Icons.logout, color: Colors.white),
+        label: Text(
+          _isLoggingOut ? 'Logging out...' : 'Logout',
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
+          backgroundColor: _isLoggingOut
+              ? Colors.red.withValues(alpha: 0.7)
+              : Colors.red,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
+          disabledBackgroundColor: Colors.red.withValues(alpha: 0.7),
         ),
       ),
     );

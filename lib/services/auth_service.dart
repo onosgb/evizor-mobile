@@ -466,4 +466,38 @@ class AuthService {
       throw Exception('An unexpected error occurred: ${e.toString()}');
     }
   }
+
+  /// Logout user
+  ///
+  /// Endpoint: POST /auth/logout
+  /// Response: { "message": "string", "statusCode": number, "data": {...} }
+  Future<void> logout() async {
+    try {
+      final response = await _dio.post('/auth/logout');
+
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+    } on DioException catch (e) {
+      // Silently fail if logout endpoint fails - still clear local data
+      // This ensures user can logout even if network is unavailable
+      if (e.response?.data != null) {
+        final errorResponse = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorResponse.message);
+      } else {
+        throw Exception(
+          e.message ?? 'Network error. Please check your connection.',
+        );
+      }
+    } catch (e) {
+      // Silently fail - still allow local logout
+      if (e is Exception) rethrow;
+      throw Exception('An unexpected error occurred: ${e.toString()}');
+    }
+  }
 }
