@@ -15,7 +15,6 @@ class TenantService {
   Future<List<Tenant>> fetchAllTenants() async {
     try {
       final response = await _dio.get('/tenant/all-tenants');
-      print(response.data);
       final apiResponse = ApiResponse<List<dynamic>>.fromJson(
         response.data,
         (json) => json as List<dynamic>,
