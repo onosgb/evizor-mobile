@@ -1,0 +1,263 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../providers/consultation_provider.dart';
+import '../../utils/app_colors.dart';
+import '../../utils/app_routes.dart';
+import '../../utils/toastification.dart';
+import '../../widgets/custom_button.dart';
+
+class UploadFilesScreen extends ConsumerStatefulWidget {
+  const UploadFilesScreen({super.key});
+
+  @override
+  ConsumerState<UploadFilesScreen> createState() => _UploadFilesScreenState();
+}
+
+class _UploadFilesScreenState extends ConsumerState<UploadFilesScreen> {
+  final ImagePicker _picker = ImagePicker();
+  final List<File> _uploadedFiles = [];
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _uploadedFiles.add(File(image.path));
+        });
+      }
+    } catch (e) {
+      errorSnack('Failed to pick image: ${e.toString()}');
+    }
+  }
+
+  void _removeFile(int index) {
+    setState(() {
+      _uploadedFiles.removeAt(index);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Title
+                    const Text(
+                      'Attach Images',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Upload symptom photos or past medical records — optional.',
+                      style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 32),
+                    // Upload Options
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildUploadOption(
+                            icon: Icons.camera_alt,
+                            label: 'Camera',
+                            backgroundColor: const Color(
+                              0xFFE3F2FD,
+                            ), // Light blue
+                            iconColor: AppColors.primaryColor,
+                            textColor: AppColors.primaryColor,
+                            onTap: () => _pickImage(ImageSource.camera),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildUploadOption(
+                            icon: Icons.photo_library,
+                            label: 'Gallery',
+                            backgroundColor: const Color(
+                              0xFFE8F5E9,
+                            ), // Light green
+                            iconColor: AppColors.primaryGreen,
+                            textColor: AppColors.primaryGreen,
+                            onTap: () => _pickImage(ImageSource.gallery),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    // Uploaded Files Preview
+                    if (_uploadedFiles.isNotEmpty) ...[
+                      const Text(
+                        'Uploaded Files',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                        itemCount: _uploadedFiles.length,
+                        itemBuilder: (context, index) {
+                          final file = _uploadedFiles[index];
+
+                          return Stack(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.backgroundGrey,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.file(
+                                    file,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: () => _removeFile(index),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.error,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            // Continue Button and Skip Link
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  CustomButton(
+                    text: 'Continue',
+                    onPressed: () {
+                      // Save uploaded file paths to draft state
+                      final filePaths = _uploadedFiles
+                          .map((f) => f.path)
+                          .toList();
+                      ref
+                          .read(appointmentNotifierProvider.notifier)
+                          .saveUploadedFiles(filePaths);
+                      context.push(AppRoutes.reviewConfirm);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () {
+                      // Save empty files list to draft state
+                      ref
+                          .read(appointmentNotifierProvider.notifier)
+                          .saveUploadedFiles([]);
+                      context.push(AppRoutes.reviewConfirm);
+                    },
+                    child: const Text(
+                      'Skip for now',
+                      style: TextStyle(
+                        color: AppColors.primaryColor,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUploadOption({
+    required IconData icon,
+    required String label,
+    required Color backgroundColor,
+    required Color iconColor,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 32, color: iconColor),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

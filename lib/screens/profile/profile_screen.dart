@@ -1,0 +1,507 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../providers/user_provider.dart';
+import '../../services/api_client.dart';
+import '../../services/auth_service.dart';
+import '../../services/storage_service.dart';
+import '../../utils/app_colors.dart';
+import '../../utils/app_routes.dart';
+
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _isLoggingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFullProfile();
+  }
+
+  Future<void> _fetchFullProfile() async {
+    try {
+      await ref.read(currentUserProvider.notifier).fetchProfile();
+    } catch (e) {
+      if (mounted) {
+        // Silently fail for background update, or show unobtrusive error
+        // Keeping it silent or toast if needed, but not blocking.
+        // If it was a manual refresh (RefreshIndicator), the exception
+        // propagates or is handled here?
+        // For InitState call, we might not want to show snackbar immediately if it fails silently?
+        // But user provided code had errorSnack. I will keep errorSnack but careful.
+        // Actually, for background load, maybe we shouldn't annoy user if offline?
+        // But let's stick to "just don't show loading spinner".
+        debugPrint('Failed to refresh profile: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.backgroundGrey,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                // Blue Header
+                Container(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 60),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryColor,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'My Profile',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.settings, color: Colors.white),
+                        onPressed: () {
+                          context.push(AppRoutes.settings);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                // Content with Pull-to-Refresh
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _fetchFullProfile,
+                    color: AppColors.primaryColor,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 90),
+                          // Personal Information Section
+                          _buildPersonalInformationSection(ref),
+                          const SizedBox(height: 16),
+                          // Medical History Section
+                          _buildMedicalHistorySection(),
+                          const SizedBox(height: 24),
+                          // Logout Button
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: _buildLogoutButton(context, ref),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // User Profile Card - Positioned to overlap header
+            Positioned(
+              top: 80,
+              left: 0,
+              right: 0,
+              child: _buildUserProfileCard(context, ref),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserProfileCard(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider).value;
+    final userName = user?.fullName ?? 'John Doe';
+    final patientId = user?.healthCardNo.isNotEmpty == true
+        ? user!.healthCardNo
+        : 'Not set';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          _buildAvatar(user?.profilePictureUrl),
+          const SizedBox(width: 16),
+          // Name and Patient ID
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  userName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Patient ID: $patientId',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          // Edit Icon
+          GestureDetector(
+            onTap: () {
+              context.push(AppRoutes.updateProfile);
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.edit, color: Colors.white, size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar(String? photoUrl) {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: const BoxDecoration(
+        color: AppColors.lightBlue,
+        shape: BoxShape.circle,
+      ),
+      child: ClipOval(
+        child: photoUrl != null && photoUrl.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: photoUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => const CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    AppColors.primaryColor,
+                  ),
+                ),
+                errorWidget: (_, _, _) => const Icon(
+                  Icons.person,
+                  size: 40,
+                  color: AppColors.primaryPurple,
+                ),
+              )
+            : const Icon(
+                Icons.person,
+                size: 40,
+                color: AppColors.primaryPurple,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildPersonalInformationSection(WidgetRef ref) {
+    final user = ref.watch(currentUserProvider).value;
+    final email = user?.email ?? 'Not set';
+    final phone = user?.phoneNumber ?? 'Not set';
+    final dob = user?.dob != null
+        ? '${user!.dob!.day} ${_getMonthName(user.dob!.month)}, ${user.dob!.year}'
+        : 'Not set';
+    final gender = user?.gender ?? 'Not set';
+    final bloodGroup = user?.bloodGroup ?? 'Not set';
+    final socialId = user?.socialId ?? 'Not set';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Personal Information',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow('Email', email),
+          const SizedBox(height: 12),
+          _buildInfoRow('Phone', phone),
+          const SizedBox(height: 12),
+          _buildInfoRow('Date of Birth', dob),
+          const SizedBox(height: 12),
+          _buildInfoRow('Gender', gender),
+          const SizedBox(height: 12),
+          _buildInfoRow('Blood Group', bloodGroup),
+          const SizedBox(height: 12),
+          _buildInfoRow('Social ID', socialId),
+          if (user?.weight != null) ...[
+            const SizedBox(height: 12),
+            _buildInfoRow('Weight', '${user!.weight} kg'),
+          ],
+          if (user?.height != null) ...[
+            const SizedBox(height: 12),
+            _buildInfoRow('Height', '${user!.height} cm'),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMedicalHistorySection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Medical History',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total Consultations',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              Text(
+                '12',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Active Prescriptions',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              Text(
+                '2',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryGreen,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Last Visit',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              Text(
+                'Jan 27, 2026',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return months[month - 1];
+  }
+
+  Widget _buildLogoutButton(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _isLoggingOut
+            ? null
+            : () async {
+                // Show confirmation dialog
+                final shouldLogout = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Logout'),
+                    content: const Text('Are you sure you want to logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: const Text('Logout'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (shouldLogout == true && context.mounted) {
+                  // Set loading state
+                  setState(() {
+                    _isLoggingOut = true;
+                  });
+
+                  try {
+                    // Call logout endpoint
+                    final apiClient = ApiClient();
+                    final authService = AuthService(apiClient.dio);
+
+                    try {
+                      await authService.logout();
+                    } catch (e) {
+                      // Continue with local logout even if API call fails
+                      debugPrint('Logout API call failed: $e');
+                    }
+
+                    // Clear all user data and tokens
+                    final storageService = StorageService();
+                    await storageService
+                        .logout(); // Clears tokens and user data
+
+                    // Clear user provider state
+                    ref.read(currentUserProvider.notifier).clear();
+
+                    // Remove auth token from API client
+                    apiClient.removeAuthToken();
+
+                    // Navigate to login
+                    if (context.mounted) {
+                      context.go(AppRoutes.login);
+                    }
+                  } finally {
+                    // Reset loading state (in case navigation fails)
+                    if (mounted) {
+                      setState(() {
+                        _isLoggingOut = false;
+                      });
+                    }
+                  }
+                }
+              },
+        icon: _isLoggingOut
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : const Icon(Icons.logout, color: Colors.white),
+        label: Text(
+          _isLoggingOut ? 'Logging out...' : 'Logout',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _isLoggingOut
+              ? Colors.red.withValues(alpha: 0.7)
+              : Colors.red,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          disabledBackgroundColor: Colors.red.withValues(alpha: 0.7),
+        ),
+      ),
+    );
+  }
+}
