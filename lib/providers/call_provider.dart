@@ -55,7 +55,6 @@ class CallNotifier extends StateNotifier<CallState> {
       await service.rejectAppointment(appointmentId);
       state = CallState(); // Reset state on rejection
     } catch (e) {
-      print("Error rejecting call: $e");
       state = state.copyWith(status: CallStatus.idle);
       rethrow;
     }

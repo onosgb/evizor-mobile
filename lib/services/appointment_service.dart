@@ -14,7 +14,7 @@ class AppointmentService {
   /// Endpoint: GET /appointments/patient/latest
   Future<Appointment?> fetchLatestAppointment() async {
     try {
-      final response = await _dio.get('/appointments/patient/latest');
+      final response = await _dio.get('/appointments/latest');
       final data = response.data;
       // API returns null / empty body when no appointment exists
       if (data == null || data['data'] == null) return null;
@@ -116,7 +116,6 @@ class AppointmentService {
     try {
       final response = await _dio.post('/appointments/$appointmentId/accept');
       final data = response.data;
-      print('acceptAppointment: $data');
       // API wraps the result in { success, data: { dyteToken, meetingUrl } }
       final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
         data,

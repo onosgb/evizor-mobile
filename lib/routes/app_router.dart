@@ -21,6 +21,7 @@ import '../screens/consultation/review_confirm_screen.dart';
 import '../screens/queue/waiting_queue_screen.dart';
 import '../screens/queue/doctor_assigned_screen.dart';
 import '../screens/incoming_call_screen.dart' as v2;
+import 'package:realtimekit_core/realtimekit_core.dart';
 import '../screens/video/video_call_screen.dart';
 import '../screens/video/in_call_chat_screen.dart';
 import '../screens/video/connection_issue_screen.dart';
@@ -232,7 +233,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/video/chat',
       name: 'in-call-chat',
-      builder: (context, state) => const InCallChatScreen(),
+      builder: (context, state) {
+        final meeting = state.extra as RealtimekitClient?;
+        return InCallChatScreen(meeting: meeting);
+      },
     ),
     GoRoute(
       path: '/video/reconnecting',

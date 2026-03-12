@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:realtimekit_core/realtimekit_core.dart';
 import '../../utils/app_colors.dart';
 
 class InCallChatScreen extends StatefulWidget {
-  const InCallChatScreen({super.key});
+  final RealtimekitClient? meeting;
+  final String? doctorName;
+
+  const InCallChatScreen({super.key, this.meeting, this.doctorName});
 
   @override
   State<InCallChatScreen> createState() => _InCallChatScreenState();
@@ -11,44 +15,69 @@ class InCallChatScreen extends StatefulWidget {
 
 class _InCallChatScreenState extends State<InCallChatScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final List<ChatMessage> _messages = [
-    ChatMessage(
-      text: 'How are you feeling today?',
-      isDoctor: true,
-      timestamp: '10:30 AM',
-    ),
-    ChatMessage(
-      text: 'I have been having headaches',
-      isDoctor: false,
-      timestamp: '10:31 AM',
-    ),
-  ];
+  final List<ChatMessage> _messages = [];
+  late final RtkChatEventListener _chatListener;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _chatListener = _InCallChatEventListener(
+      onLatest: (messages) {
+        setState(() {
+          _messages
+            ..clear()
+            ..addAll(messages);
+        });
+      },
+      onNew: (message) {
+        setState(() {
+          _messages.add(message);
+        });
+      },
+    );
+
+    if (widget.meeting != null) {
+      widget.meeting!.addChatEventListener(_chatListener);
+      final existing = widget.meeting!.chat.messages;
+      if (existing.isNotEmpty) {
+        _messages.addAll(existing);
+      }
+    }
+  }
 
   @override
   void dispose() {
+    if (widget.meeting != null) {
+      widget.meeting!.removeChatEventListener(_chatListener);
+    }
     _messageController.dispose();
     super.dispose();
   }
 
   void _sendMessage() {
-    if (_messageController.text.trim().isNotEmpty) {
-      setState(() {
-        _messages.add(
-          ChatMessage(
-            text: _messageController.text.trim(),
-            isDoctor: false,
-            timestamp: '10:32 AM', // In real app, use actual time
-          ),
-        );
-        _messageController.clear();
-      });
+    final text = _messageController.text.trim();
+    if (text.isEmpty || widget.meeting == null) return;
+
+    try {
+      widget.meeting!.chat.sendTextMessage(text);
+      _messageController.clear();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send chat message: ${e.toString()}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final doctorName = widget.doctorName ?? 'Dr. Sarah Johnson';
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: AppColors.primaryColor,
         elevation: 0,
@@ -57,10 +86,11 @@ class _InCallChatScreenState extends State<InCallChatScreen> {
           padding: const EdgeInsets.only(left: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Dr. Sarah Johnson',
-                style: TextStyle(
+              Text(
+                doctorName,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -88,7 +118,7 @@ class _InCallChatScreenState extends State<InCallChatScreen> {
         children: [
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
@@ -96,34 +126,36 @@ class _InCallChatScreenState extends State<InCallChatScreen> {
               },
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 12,
+              bottom: 16,
             ),
-            child: Row(
-              children: [
-                // Attachment Icon
-                IconButton(
-                  icon: Icon(Icons.attach_file, color: Colors.grey[400]),
-                  onPressed: () {
-                    // Handle attachment
-                  },
-                ),
-                // Text Input Field
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(24),
-                    ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.grey[300]!),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.attach_file, color: Colors.grey[600]),
+                    onPressed: () {
+                      // Handle attachment (image/file)
+                    },
+                  ),
+                  Expanded(
                     child: TextField(
                       controller: _messageController,
                       style: const TextStyle(
@@ -135,30 +167,33 @@ class _InCallChatScreenState extends State<InCallChatScreen> {
                         hintStyle: TextStyle(color: Colors.grey[500]),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
+                          horizontal: 16,
                           vertical: 12,
                         ),
                       ),
                       onSubmitted: (_) => _sendMessage(),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                // Send Button
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
+                  const SizedBox(width: 4),
+                  Material(
                     color: AppColors.primaryColor,
-                    shape: BoxShape.circle,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      onTap: _sendMessage,
+                      customBorder: const CircleBorder(),
+                      child: const SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                    ),
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                    onPressed: _sendMessage,
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -167,41 +202,60 @@ class _InCallChatScreenState extends State<InCallChatScreen> {
   }
 
   Widget _buildMessageBubble(ChatMessage message) {
+    final isOwn =
+        widget.meeting != null &&
+        message.userId == widget.meeting!.localUser.userId;
+
+    String messageText;
+    if (message is TextMessage) {
+      messageText = message.message;
+    } else if (message is ImageMessage) {
+      messageText = '📷 Image: ${message.link}';
+    } else if (message is FileMessage) {
+      messageText = '📎 File: ${message.name}';
+    } else {
+      messageText = message.toString();
+    }
+
+    final timestamp = message.time.isNotEmpty ? message.time : 'Now';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
-        crossAxisAlignment: message.isDoctor
-            ? CrossAxisAlignment.start
-            : CrossAxisAlignment.end,
+        crossAxisAlignment: isOwn
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Container(
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.7,
+              maxWidth: MediaQuery.of(context).size.width * 0.75,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: message.isDoctor
-                  ? Colors.grey[300]
-                  : AppColors.primaryColor,
+              color: isOwn
+                  ? AppColors.primaryColor
+                  : Colors.grey[200],
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
-              message.text,
+              messageText,
               style: TextStyle(
-                color: message.isDoctor ? AppColors.textPrimary : Colors.white,
-                fontSize: 14,
+                color: isOwn ? Colors.white : AppColors.textPrimary,
+                fontSize: 15,
               ),
             ),
           ),
           const SizedBox(height: 4),
           Padding(
-            padding: EdgeInsets.only(
-              left: message.isDoctor ? 8 : 0,
-              right: message.isDoctor ? 0 : 8,
-            ),
+            padding: EdgeInsets.only(left: isOwn ? 0 : 8, right: isOwn ? 8 : 0),
             child: Text(
-              message.timestamp ?? 'Now',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              timestamp,
+              style: TextStyle(
+                color: isOwn
+                    ? Colors.grey[600]
+                    : Colors.grey[600],
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -210,10 +264,19 @@ class _InCallChatScreenState extends State<InCallChatScreen> {
   }
 }
 
-class ChatMessage {
-  final String text;
-  final bool isDoctor;
-  final String? timestamp;
+class _InCallChatEventListener extends RtkChatEventListener {
+  final void Function(List<ChatMessage>) onLatest;
+  final void Function(ChatMessage) onNew;
 
-  ChatMessage({required this.text, required this.isDoctor, this.timestamp});
+  _InCallChatEventListener({required this.onLatest, required this.onNew});
+
+  @override
+  void onChatUpdates(List<ChatMessage> messages) {
+    onLatest(messages);
+  }
+
+  @override
+  void onNewChatMessage(ChatMessage message) {
+    onNew(message);
+  }
 }

@@ -3,8 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:realtimekit_core/realtimekit_core.dart';
+import 'dart:async';
+import 'dart:convert';
 import '../../utils/app_routes.dart';
 import '../../providers/call_provider.dart';
+import '../../providers/appointment_provider.dart';
+import 'in_call_chat_screen.dart';
 
 class VideoCallScreen extends ConsumerStatefulWidget {
   const VideoCallScreen({super.key});
@@ -21,6 +25,17 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
   bool _pageLoaded = false;
   String? _error;
 
+  final List<ChatMessage> _chatMessages = [];
+  RtkChatEventListener? _chatListener;
+  Timer? _chatPollTimer;
+  /// Unread chat count: when user opens chat, we set _chatReadCount = length so badge shows 0 until new messages arrive.
+  int _chatReadCount = 0;
+  DateTime? _callStartedAt;
+  Timer? _callDurationTimer;
+
+  /// Fallback: first remote we got from onParticipantJoin in case joined list lags.
+  RtkRemoteParticipant? _firstRemoteFromCallback;
+
   // Animation controllers
   late AnimationController _pulseController;
   late AnimationController _fadeController;
@@ -28,6 +43,17 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
   late Animation<double> _fadeAnimation;
 
   static const String _logTag = '[VideoCall]';
+
+  int get _chatUnreadCount =>
+      (_chatMessages.length - _chatReadCount).clamp(0, 999);
+
+  String _formatCallDuration() {
+    if (_callStartedAt == null) return '00:00';
+    final elapsed = DateTime.now().difference(_callStartedAt!);
+    final minutes = elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
 
   @override
   void initState() {
@@ -68,6 +94,9 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
       try {
         _meeting!.removeParticipantsEventListener(this);
         _meeting!.removeMeetingRoomEventListener(this);
+        if (_chatListener != null) {
+          _meeting!.removeChatEventListener(_chatListener!);
+        }
         _meeting!.leaveRoom(
           onSuccess: () {
             _meeting!.cleanAllNativeListeners();
@@ -80,6 +109,8 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
         debugPrint("Error during meeting cleanup: $e");
       }
     }
+    _chatPollTimer?.cancel();
+    _callDurationTimer?.cancel();
     _pulseController.dispose();
     _fadeController.dispose();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
@@ -102,7 +133,7 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
     debugPrint('$_logTag onMeetingInitCompleted → calling joinRoom()');
     _meeting?.joinRoom(
       onSuccess: () {
-        debugPrint('$_logTag joinRoom onSuccess (room join in progress)');
+        debugPrint('$_logTag [MOBILE] joinRoom onSuccess — we are joining the room');
       },
       onError: (error) {
         debugPrint('$_logTag joinRoom onError: $error');
@@ -117,7 +148,9 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
 
   @override
   void onMeetingInitFailed(MeetingError error) {
-    debugPrint('$_logTag onMeetingInitFailed: $error | _pageLoaded=true, _error set');
+    debugPrint(
+      '$_logTag onMeetingInitFailed: $error | _pageLoaded=true, _error set',
+    );
     if (mounted) {
       setState(() {
         _pageLoaded = true;
@@ -139,18 +172,34 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
 
   @override
   void onMeetingRoomJoinCompleted() {
-    debugPrint('$_logTag onMeetingRoomJoinCompleted | _isReady=true, _pageLoaded=true');
+    debugPrint(
+      '$_logTag [MOBILE] onMeetingRoomJoinCompleted — we have joined the room',
+    );
     if (mounted) {
       setState(() {
         _isReady = true;
         _pageLoaded = true;
+        _callStartedAt = DateTime.now();
       });
+      _callDurationTimer?.cancel();
+      _callDurationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+      _bindChatListener();
+      // SDK may populate participants asynchronously; force rebuilds to pick up joined/active
+      for (final delayMs in [100, 300, 600, 1000]) {
+        Future.delayed(Duration(milliseconds: delayMs), () {
+          if (mounted && _meeting != null) setState(() {});
+        });
+      }
     }
   }
 
   @override
   void onMeetingRoomJoinFailed(MeetingError error) {
-    debugPrint('$_logTag onMeetingRoomJoinFailed: $error | _pageLoaded=true, _error set');
+    debugPrint(
+      '$_logTag onMeetingRoomJoinFailed: $error | _pageLoaded=true, _error set',
+    );
     if (mounted) {
       setState(() {
         _pageLoaded = true;
@@ -193,14 +242,28 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
 
   @override
   void onParticipantJoin(RtkRemoteParticipant participant) {
-    debugPrint('$_logTag onParticipantJoin: ${participant.name} (${participant.id})');
-    if (mounted) setState(() {});
+    debugPrint(
+      '$_logTag [MOBILE] Someone joined the room: ${participant.name} (id=${participant.id})',
+    );
+    if (mounted) {
+      setState(() {
+        if (_firstRemoteFromCallback == null) {
+          _firstRemoteFromCallback = participant;
+        }
+      });
+    }
   }
 
   @override
   void onParticipantLeave(RtkRemoteParticipant participant) {
     debugPrint('$_logTag onParticipantLeave: ${participant.id}');
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        if (_firstRemoteFromCallback?.id == participant.id) {
+          _firstRemoteFromCallback = null;
+        }
+      });
+    }
   }
 
   @override
@@ -252,7 +315,24 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
       });
       return;
     }
-    debugPrint('$_logTag _initializeRealtimeKit: token present (length=${token.length}), creating meeting & calling init()');
+    debugPrint(
+      '$_logTag _initializeRealtimeKit: token present (length=${token.length}), creating meeting & calling init()',
+    );
+
+    // Log meeting ID from token so you can compare with web (must be same meeting)
+    try {
+      final parts = token.split('.');
+      if (parts.length >= 2) {
+        var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+        while (payload.length % 4 != 0) payload += '=';
+        final decoded = utf8.decode(base64Url.decode(payload));
+        final json = jsonDecode(decoded) as Map<String, dynamic>;
+        final meetingId = json['meetingId'] ?? json['meeting_id'];
+        if (meetingId != null) {
+          debugPrint('$_logTag [MOBILE] Token meeting ID: $meetingId');
+        }
+      }
+    } catch (_) {}
 
     try {
       final meeting = RealtimekitClient();
@@ -266,13 +346,17 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
 
       meeting.init(meetingInfo);
       meeting.addParticipantsEventListener(this);
-      debugPrint('$_logTag _initializeRealtimeKit: meeting.init() called, 30s timeout scheduled');
+      debugPrint(
+        '$_logTag _initializeRealtimeKit: meeting.init() called, 30s timeout scheduled',
+      );
 
       // Fallback guard: avoid stuck spinner if SDK events are delayed/unreceived.
       // Often caused by network (e.g. WebRTC blocked on cellular or restrictive Wi‑Fi).
       Future.delayed(const Duration(seconds: 30), () {
         if (mounted && !_pageLoaded && _error == null) {
-          debugPrint('$_logTag 30s timeout fired → _pageLoaded=true, _error set (connection timeout)');
+          debugPrint(
+            '$_logTag 30s timeout fired → _pageLoaded=true, _error set (connection timeout)',
+          );
           setState(() {
             _pageLoaded = true;
             _error =
@@ -295,12 +379,84 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
     }
   }
 
+  void _bindChatListener() {
+    final meeting = _meeting;
+    if (meeting == null || _chatListener != null) return;
+
+    _chatListener = _VideoCallChatEventListener(
+      onLatest: (messages) {
+        debugPrint('$_logTag [MOBILE] onChatUpdates: ${messages.length} messages (full list)');
+        for (var i = 0; i < messages.length; i++) {
+          final msg = messages[i];
+          final preview = msg is TextMessage ? msg.message : msg.toString();
+          debugPrint('$_logTag   msg[$i] userId=${msg.userId} preview=${preview.length > 40 ? "${preview.substring(0, 40)}..." : preview}');
+        }
+        if (!mounted) return;
+        setState(() {
+          _chatMessages
+            ..clear()
+            ..addAll(messages);
+        });
+      },
+      onNew: (message) {
+        final preview = message is TextMessage ? message.message : message.toString();
+        debugPrint('$_logTag [MOBILE] onNewChatMessage received userId=${message.userId} preview=$preview');
+        if (!mounted) return;
+        setState(() {
+          _chatMessages.add(message);
+        });
+      },
+    );
+
+    meeting.addChatEventListener(_chatListener!);
+    final existing = meeting.chat.messages;
+    if (existing.isNotEmpty) {
+      debugPrint('$_logTag [MOBILE] chat bind: synced ${existing.length} existing messages');
+      setState(() {
+        _chatMessages
+          ..clear()
+          ..addAll(existing);
+      });
+    } else {
+      debugPrint('$_logTag [MOBILE] chat listener bound');
+    }
+
+    // Fallback: Doc says "meeting.chat.messages list is automatically updated" when
+    // a message is received; if SDK does not call onChatUpdates/onNewChatMessage on
+    // Flutter, polling this list still shows messages from web.
+    _chatPollTimer?.cancel();
+    _chatPollTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      final m = _meeting;
+      if (m == null || !mounted) return;
+      final latest = m.chat.messages;
+      if (latest.length != _chatMessages.length) {
+        debugPrint('$_logTag [MOBILE] poll sync: ${latest.length} messages (was ${_chatMessages.length})');
+        if (latest.isNotEmpty) {
+          final first = latest.first;
+          final last = latest.last;
+          final firstPreview = first is TextMessage ? first.message : first.toString();
+          final lastPreview = last is TextMessage ? last.message : last.toString();
+          debugPrint('$_logTag   first: $firstPreview');
+          debugPrint('$_logTag   last: $lastPreview');
+        }
+        if (mounted) {
+          setState(() {
+            _chatMessages
+              ..clear()
+              ..addAll(latest);
+          });
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_error != null) return _buildErrorScreen();
 
     return Scaffold(
       backgroundColor: const Color(0xFF08081A),
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           if (_isReady && _meeting != null) _buildCoreCallUI(),
@@ -314,10 +470,26 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
   /// Minimal call UI using only realtimekit_core VideoView (lighter than UI kit, can reduce lag).
   Widget _buildCoreCallUI() {
     final m = _meeting!;
-    final remoteParticipants = m.participants.joined;
-    final firstRemote = remoteParticipants.isNotEmpty
-        ? remoteParticipants.first
-        : null;
+    final joined = m.participants.joined;
+    final active = m.participants.active;
+    // Prefer active (participants to display); then joined; then callback fallback.
+    final firstRemote = active.isNotEmpty
+        ? active.first
+        : joined.isNotEmpty
+        ? joined.first
+        : _firstRemoteFromCallback;
+
+    // Doctor info from latest appointment (current call)
+    final appointment = ref.watch(latestAppointmentProvider).valueOrNull;
+    final doctorName = (appointment?.doctorName.isNotEmpty == true)
+        ? appointment!.doctorName
+        : (firstRemote?.name.isNotEmpty == true ? firstRemote!.name : null);
+    final displayName = doctorName ?? 'Waiting for participant';
+    final subtitle = appointment?.doctorSpecialty ?? 'General Physician';
+
+    debugPrint(
+      '$_logTag _buildCoreCallUI: joined=${joined.length} active=${active.length} firstRemote=${firstRemote != null}',
+    );
 
     return Stack(
       fit: StackFit.expand,
@@ -326,11 +498,11 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
         Positioned.fill(
           child: firstRemote != null
               ? firstRemote.videoEnabled
-                  ? VideoView(
-                      key: ValueKey('remote-${firstRemote.id}'),
-                      meetingParticipant: firstRemote,
-                    )
-                  : _buildRemotePlaceholder(firstRemote)
+                    ? VideoView(
+                        key: ValueKey('remote-${firstRemote.id}'),
+                        meetingParticipant: firstRemote,
+                      )
+                    : _buildRemotePlaceholder(firstRemote)
               : Container(
                   color: const Color(0xFF12122A),
                   child: Center(
@@ -344,28 +516,166 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
                   ),
                 ),
         ),
-        // Self video (pip) — SDK requires meetingParticipant to be null when isSelfParticipant is true
+        // Top section: call timer (left), participant avatar + name + subtitle (center), PiP (top-right, no overlap)
         Positioned(
-          top: MediaQuery.of(context).padding.top + 16,
-          right: 16,
-          width: 120,
-          height: 160,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: const VideoView(
-              meetingParticipant: null,
-              isSelfParticipant: true,
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Call timer badge (top-left)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _formatCallDuration(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Center: large avatar + name + subtitle (no PiP here)
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Large circular avatar with gradient
+                        Container(
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFF6C47FF),
+                                Color(0xFF8B6CF7),
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF6C47FF).withValues(alpha: 0.4),
+                                blurRadius: 16,
+                                spreadRadius: 0,
+                              ),
+                            ],
+                          ),
+                          child: displayName != 'Waiting for participant' &&
+                                  displayName.isNotEmpty
+                              ? ClipOval(
+                                  child: Center(
+                                    child: Text(
+                                      displayName
+                                          .trim()
+                                          .substring(0, 1)
+                                          .toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 36,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.person_rounded,
+                                  size: 44,
+                                  color: Colors.white70,
+                                ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // PiP self-view at top-right, not overlapping doctor
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 64,
+                      height: 86,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A2E),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white24,
+                          width: 1,
+                        ),
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          const VideoView(
+                            meetingParticipant: null,
+                            isSelfParticipant: true,
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Icon(
+                              Icons.videocam,
+                              size: 12,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-        // Bottom controls
+        // Bottom controls — order: Mic | Video | End Call | Chat (with badge)
         Positioned(
           left: 0,
           right: 0,
-          bottom: MediaQuery.of(context).padding.bottom + 24,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
+          bottom: 0,
+          child: Container(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).padding.bottom + 24,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.35),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
               _controlButton(
                 icon: m.localUser.audioEnabled ? Icons.mic : Icons.mic_off,
                 label: m.localUser.audioEnabled ? 'Mute' : 'Unmute',
@@ -414,9 +724,41 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
                 },
                 backgroundColor: Colors.red,
               ),
+              _controlButton(
+                icon: Icons.chat,
+                label: 'Chat',
+                onPressed: () {
+                  if (!mounted || _meeting == null) return;
+                  _bindChatListener();
+                  final chatDoctorName = appointment?.doctorName.isNotEmpty == true
+                      ? appointment!.doctorName
+                      : (active.isNotEmpty
+                          ? active.first.name
+                          : joined.isNotEmpty
+                              ? joined.first.name
+                              : _firstRemoteFromCallback?.name);
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => InCallChatScreen(
+                        meeting: _meeting,
+                        doctorName: chatDoctorName,
+                      ),
+                    ),
+                  ).then((_) {
+                    if (mounted) {
+                      setState(() {
+                        _chatReadCount = _chatMessages.length;
+                      });
+                    }
+                  });
+                },
+                badgeCount: _chatUnreadCount,
+              ),
             ],
           ),
         ),
+        ),
+
       ],
     );
   }
@@ -469,22 +811,49 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
     required String label,
     required VoidCallback onPressed,
     Color? backgroundColor,
+    int? badgeCount,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Material(
-          color: backgroundColor ?? Colors.white.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(28),
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(28),
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: Icon(icon, color: Colors.white, size: 28),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Material(
+              color: backgroundColor ?? Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(28),
+              child: InkWell(
+                onTap: onPressed,
+                borderRadius: BorderRadius.circular(28),
+                child: SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: Icon(icon, color: Colors.white, size: 28),
+                ),
+              ),
             ),
-          ),
+            if (badgeCount != null && badgeCount > 0)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  constraints: const BoxConstraints(minWidth: 20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A27C2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    badgeCount > 99 ? '99+' : '$badgeCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 6),
         Text(
@@ -733,6 +1102,25 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen>
         ),
       ),
     );
+  }
+}
+
+class _VideoCallChatEventListener extends RtkChatEventListener {
+  final void Function(List<ChatMessage>) onLatest;
+  final void Function(ChatMessage) onNew;
+
+  _VideoCallChatEventListener({required this.onLatest, required this.onNew});
+
+  /// Doc: onChatUpdates receives the full list of all chat messages in the meeting.
+  @override
+  void onChatUpdates(List<ChatMessage> messages) {
+    onLatest(messages);
+  }
+
+  /// Doc: onNewChatMessage is called for each new message (optional; meeting.chat.messages is also updated).
+  @override
+  void onNewChatMessage(ChatMessage message) {
+    onNew(message);
   }
 }
 

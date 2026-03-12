@@ -53,7 +53,6 @@ dependencies:
   url_launcher: ^6.3.2
   flutter_ringtone_player: ^4.0.0+4
   realtimekit_core: ^0.1.5+1
-  realtimekit_ui: ^0.3.0
 
 dev_dependencies:
   flutter_test:

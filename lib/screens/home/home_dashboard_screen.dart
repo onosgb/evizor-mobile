@@ -43,7 +43,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not join call: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(
+              'Could not join call: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
@@ -216,11 +218,11 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       case AppointmentStatus.clinical:
         return 'Upcoming Appointment';
       case AppointmentStatus.progress:
-        return 'Appointment in Progress';
+        return 'Appointment';
       case AppointmentStatus.completed:
-        return 'Completed Appointment';
+        return 'Appointment';
       case AppointmentStatus.cancelled:
-        return 'Cancelled Appointment';
+        return 'Appointment';
       default:
         return 'Appointment';
     }
@@ -228,16 +230,14 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
 
   String _statusLabel(AppointmentStatus status) {
     switch (status) {
-      case AppointmentStatus.scheduled:
-        return 'Scheduled';
       case AppointmentStatus.progress:
-        return 'In Progress';
+        return 'Progress';
       case AppointmentStatus.completed:
         return 'Completed';
       case AppointmentStatus.cancelled:
         return 'Cancelled';
       default:
-        return 'Pending';
+        return 'Waiting';
     }
   }
 
@@ -651,8 +651,8 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                 _isJoining && isJoinable
                     ? 'Joining...'
                     : isJoinable
-                        ? 'Join Now'
-                        : 'Waiting for Doctor...',
+                    ? 'Join Now'
+                    : 'Waiting for Doctor...',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,

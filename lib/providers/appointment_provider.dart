@@ -43,18 +43,30 @@ class AppointmentsNotifier
   }
 
   Future<void> fetchInitial() async {
-    state = const AsyncValue.loading();
     try {
+      try {
+        state = const AsyncValue.loading();
+      } catch (_) {
+        return; // Notifier already disposed
+      }
       final appointments = await _service.fetchAppointments(page: 1, limit: 10);
-      state = AsyncValue.data(
-        PaginatedAppointmentsState(
-          appointments: appointments,
-          page: 1,
-          hasMore: appointments.length >= 10,
-        ),
-      );
+      try {
+        state = AsyncValue.data(
+          PaginatedAppointmentsState(
+            appointments: appointments,
+            page: 1,
+            hasMore: appointments.length >= 10,
+          ),
+        );
+      } catch (_) {
+        // Ignore if notifier was disposed during the async gap
+      }
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      try {
+        state = AsyncValue.error(e, st);
+      } catch (_) {
+        // Ignore if notifier was disposed (e.g. user navigated away)
+      }
     }
   }
 
