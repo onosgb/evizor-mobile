@@ -47,9 +47,11 @@ class PrescriptionsListScreen extends ConsumerWidget {
               child: appointmentsAsync.when(
                 data: (state) {
                   final prescriptionAppointments = state.appointments
-                      .where((a) =>
-                          a.status == AppointmentStatus.completed ||
-                          a.status == AppointmentStatus.clinical)
+                      .where(
+                        (a) =>
+                            a.status == AppointmentStatus.completed ||
+                            a.status == AppointmentStatus.clinical,
+                      )
                       .toList();
 
                   if (prescriptionAppointments.isEmpty) {
@@ -104,10 +106,7 @@ class PrescriptionsListScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPrescriptionCard(
-    BuildContext context,
-    Appointment appointment,
-  ) {
+  Widget _buildPrescriptionCard(BuildContext context, Appointment appointment) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -169,7 +168,7 @@ class PrescriptionsListScreen extends ConsumerWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                context.push('/prescription/${appointment.id}');
+                context.push('${AppRoutes.prescription}/${appointment.id}');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryColor,
@@ -206,7 +205,7 @@ class PrescriptionsListScreen extends ConsumerWidget {
       'Sep',
       'Oct',
       'Nov',
-      'Dec'
+      'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
