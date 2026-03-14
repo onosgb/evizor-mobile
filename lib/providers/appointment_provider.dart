@@ -140,6 +140,13 @@ class LatestAppointmentNotifier extends AutoDisposeAsyncNotifier<Appointment?> {
       return service.fetchLatestAppointment();
     });
   }
+
+  /// Cancel the current appointment
+  Future<void> cancelAppointment(String appointmentId) async {
+    final service = ref.read(appointmentServiceProvider);
+    await service.cancelAppointment(appointmentId);
+    state = const AsyncValue.data(null);
+  }
 }
 
 final latestAppointmentProvider =

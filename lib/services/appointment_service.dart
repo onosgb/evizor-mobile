@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import '../models/api_error_response.dart';
 import '../models/api_response.dart';
 import '../models/appointment.dart';
+import '../models/prescription_model.dart';
 import 'api_client.dart';
 
 /// Service for managing appointments
@@ -154,6 +155,60 @@ class AppointmentService {
         throw Exception(errorData.message);
       }
       throw Exception(e.message ?? 'Failed to reject appointment');
+    } catch (e) {
+      throw Exception('Unexpected error: ${e.toString()}');
+    }
+  }
+
+  /// Cancel an appointment
+  ///
+  /// Endpoint: PUT /appointments/:id/cancel
+  Future<void> cancelAppointment(String appointmentId) async {
+    try {
+      await _dio.put('/appointments/$appointmentId/cancel');
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final errorData = ApiErrorResponse.fromJson(e.response!.data);
+        throw Exception(errorData.message);
+      }
+      throw Exception(e.message ?? 'Failed to cancel appointment');
+    } catch (e) {
+      throw Exception('Unexpected error: ${e.toString()}');
+    }
+  }
+
+  /// Fetch prescription for an appointment
+  ///
+  /// Endpoint: GET /clinical-records/appointment/:id/prescription
+  Future<Prescription> fetchPrescription(String appointmentId) async {
+    print('Fetching prescription for appointment: $appointmentId');
+    try {
+      final response = await _dio.get(
+        '/clinical-records/appointment/$appointmentId/prescription',
+      );
+      final apiResponse = ApiResponse<Map<String, dynamic>>.fromJson(
+        response.data,
+        (json) => json as Map<String, dynamic>,
+      );
+
+      if (!apiResponse.isSuccess) {
+        throw Exception(apiResponse.message);
+      }
+
+      return Prescription.fromJson(apiResponse.data);
+    } on DioException catch (e) {
+      if (e.response != null) {
+        // The error response might not follow ApiErrorResponse if it's a different module
+        try {
+          final errorData = ApiErrorResponse.fromJson(e.response!.data);
+          throw Exception(errorData.message);
+        } catch (_) {
+          throw Exception(
+            e.response?.data['message'] ?? 'Failed to fetch prescription',
+          );
+        }
+      }
+      throw Exception(e.message ?? 'Failed to fetch prescription');
     } catch (e) {
       throw Exception('Unexpected error: ${e.toString()}');
     }

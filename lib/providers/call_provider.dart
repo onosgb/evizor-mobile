@@ -31,7 +31,6 @@ class CallNotifier extends StateNotifier<CallState> {
   }
 
   void handleIncoming(Map<String, dynamic> data) {
-    print("Incoming call: $data");
     state = state.copyWith(payload: data, status: CallStatus.incoming);
   }
 
@@ -39,11 +38,9 @@ class CallNotifier extends StateNotifier<CallState> {
     try {
       final service = AppointmentService();
       final token = await service.acceptAppointment(appointmentId);
-      print("Accepted call: $token");
       state = state.copyWith(dyteToken: token, status: CallStatus.active);
       return token;
     } catch (e) {
-      print("Error accepting call: $e");
       state = state.copyWith(status: CallStatus.idle);
       rethrow;
     }

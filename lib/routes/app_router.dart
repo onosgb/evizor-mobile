@@ -251,9 +251,12 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const ConsultationSummaryScreen(),
     ),
     GoRoute(
-      path: '/prescription',
+      path: '/prescription/:appointmentId',
       name: 'prescription',
-      builder: (context, state) => const PrescriptionScreen(),
+      builder: (context, state) {
+        final appointmentId = state.pathParameters['appointmentId'] ?? '';
+        return PrescriptionScreen(appointmentId: appointmentId);
+      },
     ),
     GoRoute(
       path: '/follow-up',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/custom_button.dart';
@@ -61,13 +62,15 @@ class VisitDetailsScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 16),
                 child: _buildSection(
                   'Symptoms',
-                  appointment.symptoms.join(', '),
+                  appointment.symptoms.map((s) => s.name).join(', '),
                 ),
               ),
+            if (appointment.doctorNotes?.isNotEmpty == true) ...[
+              const SizedBox(height: 16),
+              _buildSection('Doctor Notes', appointment.doctorNotes!),
+            ],
             const SizedBox(height: 16),
-            _buildSection('Doctor Notes', 'No notes available yet.'),
-            const SizedBox(height: 16),
-            _buildSection('Prescription', 'No prescription available yet.'),
+            _buildPrescriptionSection(context),
             const SizedBox(height: 24),
             CustomButton(text: 'Download Summary', onPressed: () {}),
             const SizedBox(height: 12),
@@ -87,6 +90,50 @@ class VisitDetailsScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPrescriptionSection(BuildContext context) {
+    // Prescriptions are usually available for completed or clinical status
+    final isAvailable = appointment.status == AppointmentStatus.completed || 
+                        appointment.status == AppointmentStatus.clinical;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Prescription',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              if (isAvailable)
+                TextButton(
+                  onPressed: () => context.push('/prescription/${appointment.id}'),
+                  child: const Text('View Details'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            isAvailable 
+              ? 'Prescription follows the consultation details.' 
+              : 'No prescription available yet.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              height: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }

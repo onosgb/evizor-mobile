@@ -1,32 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/appointment.dart';
+import '../../providers/appointment_provider.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/app_routes.dart';
 
-class PrescriptionsListScreen extends StatelessWidget {
+class PrescriptionsListScreen extends ConsumerWidget {
   const PrescriptionsListScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> prescriptions = [
-      {
-        'doctor': 'Dr. Sarah Johnson',
-        'date': 'Jan 27, 2026',
-        'status': 'active',
-        'medications': 2,
-      },
-      {
-        'doctor': 'Dr. Michael Chen',
-        'date': 'Jan 15, 2026',
-        'status': 'active',
-        'medications': 1,
-      },
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appointmentsAsync = ref.watch(appointmentsNotifierProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundGrey,
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Section
             Padding(
@@ -51,18 +42,34 @@ class PrescriptionsListScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            // Prescription Cards
+            // Content
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                itemCount: prescriptions.length,
-                itemBuilder: (context, index) {
-                  final prescription = prescriptions[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildPrescriptionCard(context, prescription),
+              child: appointmentsAsync.when(
+                data: (state) {
+                  final prescriptionAppointments = state.appointments
+                      .where((a) =>
+                          a.status == AppointmentStatus.completed ||
+                          a.status == AppointmentStatus.clinical)
+                      .toList();
+
+                  if (prescriptionAppointments.isEmpty) {
+                    return _buildEmptyState();
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    itemCount: prescriptionAppointments.length,
+                    itemBuilder: (context, index) {
+                      final appointment = prescriptionAppointments[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildPrescriptionCard(context, appointment),
+                      );
+                    },
                   );
                 },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Center(child: Text('Error: $error')),
               ),
             ),
           ],
@@ -71,13 +78,36 @@ class PrescriptionsListScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.description_outlined, size: 64, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text(
+            'No prescriptions found',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Your prescriptions will appear here after your visits.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPrescriptionCard(
     BuildContext context,
-    Map<String, dynamic> prescription,
+    Appointment appointment,
   ) {
-    final isActive = prescription['status'] == 'active';
-    final medicationsCount = prescription['medications'] as int;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -94,31 +124,30 @@ class PrescriptionsListScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Row: Icon, Doctor Info, Status Badge
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Purple Document Icon
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: AppColors.primaryPurple.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.description,
                   color: AppColors.primaryPurple,
                   size: 24,
                 ),
               ),
               const SizedBox(width: 16),
-              // Doctor Name and Details
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      prescription['doctor'],
+                      appointment.doctorName.isNotEmpty
+                          ? appointment.doctorName
+                          : 'General Practitioner',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -127,80 +156,58 @@ class PrescriptionsListScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      prescription['date'],
+                      'Visit Date: ${_formatDate(appointment.scheduledAt)}',
                       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$medicationsCount ${medicationsCount == 1 ? 'medication' : 'medications'} prescribed',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
                   ],
                 ),
               ),
-              // Active Status Badge
-              if (isActive)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGreen.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    'Active',
-                    style: TextStyle(
-                      color: AppColors.primaryGreen,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: 16),
-          // View Details Button and Download Icon Row
-          Row(
-            children: [
-              // View Details Button
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    context.push(AppRoutes.prescription);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'View Details',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Download Icon
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                context.push('/prescription/${appointment.id}');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.download, color: Colors.grey[700], size: 24),
               ),
-            ],
+              child: const Text(
+                'View Prescription',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }

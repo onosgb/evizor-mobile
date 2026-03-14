@@ -372,7 +372,9 @@ class _VisitHistoryScreenState extends ConsumerState<VisitHistoryScreen> {
                           text: appointment.description.isNotEmpty
                               ? appointment.description
                               : (appointment.symptoms.isNotEmpty
-                                    ? appointment.symptoms.join(', ')
+                                    ? appointment.symptoms
+                                        .map((s) => s.name)
+                                        .join(', ')
                                     : 'No description'),
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,

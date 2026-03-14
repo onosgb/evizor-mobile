@@ -8,6 +8,23 @@ enum AppointmentStatus {
   unknown,
 }
 
+/// Symptom item in an appointment (name + severity)
+class AppointmentSymptom {
+  final String name;
+  final int severity;
+
+  const AppointmentSymptom({required this.name, required this.severity});
+
+  factory AppointmentSymptom.fromJson(Map<String, dynamic> json) {
+    return AppointmentSymptom(
+      name: json['name'] as String? ?? '',
+      severity: json['severity'] as int? ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'name': name, 'severity': severity};
+}
+
 class Appointment {
   final String id;
   final String patientId;
@@ -21,7 +38,7 @@ class Appointment {
   final DateTime scheduledAt;
   final DateTime createdAt;
   final List<String> attachments;
-  final List<String> symptoms;
+  final List<AppointmentSymptom> symptoms;
   final String? patientHeight;
   final String? patientWeight;
   final String? doctorSpecialty;
@@ -29,6 +46,9 @@ class Appointment {
   final String? doctorImageUrl;
   final String? patientRegisteredDate;
   final String? patientDob;
+  final String? tenantId;
+  final int? queuePosition;
+  final String? doctorNotes;
 
   Appointment({
     required this.id,
@@ -51,6 +71,9 @@ class Appointment {
     this.doctorImageUrl,
     this.patientRegisteredDate,
     this.patientDob,
+    this.tenantId,
+    this.queuePosition,
+    this.doctorNotes,
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
@@ -73,9 +96,7 @@ class Appointment {
       attachments: json['attachments'] is List
           ? (json['attachments'] as List).map((e) => e.toString()).toList()
           : [],
-      symptoms: json['symptoms'] is List
-          ? (json['symptoms'] as List).map((e) => e.toString()).toList()
-          : [],
+      symptoms: _parseSymptoms(json['symptoms']),
       patientHeight: json['patientHeight']?.toString(),
       patientWeight: json['patientWeight']?.toString(),
       doctorSpecialty: json['doctorSpecialty']?.toString(),
@@ -83,7 +104,25 @@ class Appointment {
       doctorImageUrl: json['doctorImageUrl']?.toString(),
       patientRegisteredDate: json['patientRegisteredDate']?.toString(),
       patientDob: json['patientDob']?.toString(),
+      tenantId: json['tenantId']?.toString(),
+      queuePosition: json['queuePosition'] is int
+          ? json['queuePosition'] as int
+          : (json['queuePosition'] is num
+              ? (json['queuePosition'] as num).toInt()
+              : null),
+      doctorNotes: json['doctorNotes']?.toString(),
     );
+  }
+
+  static List<AppointmentSymptom> _parseSymptoms(dynamic value) {
+    if (value is! List) return [];
+    final list = <AppointmentSymptom>[];
+    for (final e in value) {
+      if (e is Map<String, dynamic>) {
+        list.add(AppointmentSymptom.fromJson(e));
+      }
+    }
+    return list;
   }
 
   static AppointmentStatus _parseStatus(String? status) {
@@ -121,7 +160,7 @@ class Appointment {
       'scheduledAt': scheduledAt.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'attachments': attachments,
-      'symptoms': symptoms,
+      'symptoms': symptoms.map((s) => s.toJson()).toList(),
       'patientHeight': patientHeight,
       'patientWeight': patientWeight,
       'doctorSpecialty': doctorSpecialty,
@@ -129,6 +168,9 @@ class Appointment {
       'doctorImageUrl': doctorImageUrl,
       'patientRegisteredDate': patientRegisteredDate,
       'patientDob': patientDob,
+      'tenantId': tenantId,
+      'queuePosition': queuePosition,
+      'doctorNotes': doctorNotes,
     };
   }
 }

@@ -433,15 +433,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                         onTap: _startVisit,
                       ),
                       _buildQuickActionTile(
-                        icon: Icons.calendar_today,
-                        title: 'Schedule',
+                        icon: Icons.history,
+                        title: 'History',
                         color: AppColors.primaryGreen,
-                        onTap: () {},
-                      ),
-                      _buildQuickActionTile(
-                        icon: Icons.description,
-                        title: 'Records',
-                        color: AppColors.primaryPurple,
                         onTap: () {
                           context.push(AppRoutes.visitHistory);
                         },
@@ -451,7 +445,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                         title: 'Health',
                         color: AppColors.warning,
                         onTap: () {
-                          context.push(AppRoutes.health);
+                          context.push(AppRoutes.prescriptionsList);
                         },
                       ),
                     ],

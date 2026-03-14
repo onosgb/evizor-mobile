@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
 import '../../utils/app_colors.dart';
+import '../../providers/appointment_provider.dart';
 
-class WaitingQueueScreen extends StatefulWidget {
+class WaitingQueueScreen extends ConsumerStatefulWidget {
   const WaitingQueueScreen({super.key});
 
   @override
-  State<WaitingQueueScreen> createState() => _WaitingQueueScreenState();
+  ConsumerState<WaitingQueueScreen> createState() => _WaitingQueueScreenState();
 }
 
-class _WaitingQueueScreenState extends State<WaitingQueueScreen>
+class _WaitingQueueScreenState extends ConsumerState<WaitingQueueScreen>
     with SingleTickerProviderStateMixin {
-  int _queuePosition = 3;
   int _estimatedMinutes = 8;
   Timer? _timer;
   late AnimationController _animationController;
@@ -36,31 +37,69 @@ class _WaitingQueueScreenState extends State<WaitingQueueScreen>
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (mounted && _queuePosition > 0) {
+      if (mounted) {
         setState(() {
-          _queuePosition--;
+          // _queuePosition--;
           _estimatedMinutes = _estimatedMinutes > 1 ? _estimatedMinutes - 1 : 1;
         });
       }
     });
   }
 
-  void _handleCancel() {
+  Future<void> _handleCancel() async {
+    final appointment = ref.read(latestAppointmentProvider).valueOrNull;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Cancel Request?'),
         content: const Text(
           'Are you sure you want to cancel your consultation request?',
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(), child: const Text('No')),
           TextButton(
-            onPressed: () {
-              context.pop();
-              context.pop();
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop(); // Close dialog
+
+              if (appointment != null) {
+                try {
+                  // Show loading indicator
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (loadingContext) =>
+                        const Center(child: CircularProgressIndicator()),
+                  );
+
+                  await ref
+                      .read(latestAppointmentProvider.notifier)
+                      .cancelAppointment(appointment.id);
+
+                  if (mounted) {
+                    Navigator.of(context).pop(); // Close loading indicator
+                    context.go('/home'); // Redirect to dashboard
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.of(context).pop(); // Close loading indicator
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: ${e.toString()}')),
+                    );
+                  }
+                }
+              } else {
+                // If no appointment found, just go back
+                context.go('/home');
+              }
             },
-            child: const Text('Yes, Cancel'),
+            child: const Text(
+              'Yes, Cancel',
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -149,14 +188,24 @@ class _WaitingQueueScreenState extends State<WaitingQueueScreen>
                             ),
                             child: Column(
                               children: [
-                                Text(
-                                  '#$_queuePosition',
-                                  style: const TextStyle(
-                                    fontSize: 48,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primaryColor,
-                                  ),
-                                ),
+                                ref
+                                    .watch(latestAppointmentProvider)
+                                    .when(
+                                      loading: () =>
+                                          CircularProgressIndicator(),
+                                      error: (_, _) => const SizedBox.shrink(),
+                                      data: (appointment) => appointment == null
+                                          ? const SizedBox.shrink()
+                                          : Text(
+                                              '#${appointment.queuePosition}',
+                                              style: const TextStyle(
+                                                fontSize: 48,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.primaryColor,
+                                              ),
+                                            ),
+                                    ),
+
                                 const SizedBox(height: 8),
                                 Text(
                                   'Your position in queue',
